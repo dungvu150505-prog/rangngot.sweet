@@ -1,132 +1,202 @@
+html, body {
+  height: auto;
+  min-height: 100%;
+}
+
 body {
   font-family: 'EB Garamond', serif;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  min-height: 100vh;
+  justify-content: flex-start;
   margin: 0;
+  min-height: 100vh;
   background: linear-gradient(145deg, #fff7fa, #ffeef5);
   color: #333;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 32px 12px;
+  transition: filter 0.4s ease;
 }
 
-/* 🌸 Logo hình tròn */
+/* 🌸 Hiệu ứng làm mờ khi ghi âm */
+body.recording-active {
+  filter: blur(3px) brightness(0.95);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* 🍰 Logo và slogan */
 .logo {
-  width: 130px;
-  height: 130px;
+  width: 110px;
+  height: 110px;
   border-radius: 50%;
-  object-fit: cover;
-  margin-bottom: 8px;
-  box-shadow: 0 4px 14px rgba(255, 160, 180, 0.35);
+  margin-top: 30px;
+  box-shadow: 0 4px 10px rgba(255, 182, 193, 0.3);
   animation: heartbeat 3s ease-in-out infinite;
 }
 
-/* 💞 Hiệu ứng nhịp tim */
 @keyframes heartbeat {
   0%, 100% { transform: scale(1); }
-  25% { transform: scale(1.05); }
-  50% { transform: scale(1.1); }
-  75% { transform: scale(1.05); }
+  50% { transform: scale(1.06); }
 }
 
-/* ✨ Slogan */
 .slogan {
-  font-size: 1rem;
-  color: #d32f2f;
-  font-style: italic;
-  font-weight: 500;
-  opacity: 0.95;
-  margin-bottom: 24px;
-  animation: fadeIn 2s ease;
+  margin-top: 10px;
+  color: #e2528e;
+  font-weight: 600;
+  text-align: center;
+  font-size: 1.1rem;
+  animation: fadeIn 1.2s ease;
 }
-@keyframes fadeIn { from {opacity:0; transform:translateY(-8px);} to {opacity:1; transform:translateY(0);} }
 
-/* 🎀 Thiệp */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 🎀 Thẻ thiệp */
 .card {
-  position: relative;
-  z-index: 1;
-  width: clamp(320px, 90vw, 520px);
-  padding: 36px;
-  border-radius: 24px;
-  box-shadow: 0 8px 28px rgba(255, 170, 200, 0.25);
-  background: rgba(255, 255, 255, 0.92);
+  background: white;
+  border-radius: 22px;
+  box-shadow: 0 8px 25px rgba(255, 170, 200, 0.25);
+  padding: 28px 24px 36px;
   text-align: center;
-  border: 1px solid #ffd6e6;
-  backdrop-filter: blur(6px);
+  margin-top: 20px;
+  margin-bottom: 64px;
+  width: 100%;
+  max-width: 440px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-h1 {
-  margin: 0 0 14px;
-  font-size: 1.5rem;
-  color: #e2528e;
-  font-weight: 700;
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(255, 160, 190, 0.28);
 }
 
-p {
-  margin: 0 0 22px;
+.card h1 {
+  color: #d63384;
+  font-size: 1.6rem;
+  margin-bottom: 12px;
+}
+
+.card p {
+  font-size: 1rem;
   color: #555;
-  font-size: 1.05rem;
-  line-height: 1.5;
+  margin-bottom: 16px;
 }
 
+/* 🎵 Nút chính */
 .play {
-  font-size: 1.05rem;
-  padding: 14px 22px;
-  border-radius: 14px;
-  border: none;
-  background: #ff93b8;
+  background-color: #ff87b4;
   color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 14px;
+  font-size: 1rem;
   cursor: pointer;
-  box-shadow: 0 6px 12px rgba(255, 122, 162, 0.25);
-  transition: all 0.3s ease;
-  font-family: 'EB Garamond', serif;
-}
-.play:hover { background: #ff79a4; transform: scale(1.05); }
-
-.note { margin-top: 16px; font-size: 0.9rem; color: #888; }
-
-/* 💗 Trái tim hồng bay */
-.heart {
-  position: absolute;
-  bottom: -20px;
-  width: 16px; height: 16px;
-  background-color: #ff9ebd;
-  transform: rotate(45deg);
-  opacity: 0.8;
-  animation: floatUp 6s ease-in infinite;
-}
-.heart::before, .heart::after {
-  content: "";
-  position: absolute;
-  width: 16px; height: 16px;
-  background-color: #ff9ebd; border-radius: 50%;
-}
-.heart::before { top: -8px; left: 0; }
-.heart::after  { left: -8px; top: 0; }
-@keyframes floatUp {
-  0% { transform: translateY(0) scale(1) rotate(45deg); opacity: 1; }
-  50% { transform: translateY(-150px) scale(1.2) rotate(45deg); opacity: 0.9; }
-  100% { transform: translateY(-250px) scale(0.9) rotate(45deg); opacity: 0; }
+  box-shadow: 0 4px 15px rgba(255, 100, 150, 0.25);
+  transition: all 0.2s ease;
 }
 
-/* ✅ Căn giữa khu vực kết quả + QR */
-.result-box { 
-  margin-top: 18px;
-  background: #fff6f9;
+.play:hover {
+  background-color: #ff6fa0;
+  transform: scale(1.02);
+}
+
+/* 🌷 Nút phụ */
+.btn-secondary {
+  background: #ffd1e1;
+  color: #a83f6b;
+  border: none;
   border-radius: 12px;
-  padding: 12px;
-  box-shadow: 0 2px 8px rgba(255, 180, 210, 0.2);
-  text-align: center;
+  padding: 10px 16px;
+  cursor: pointer;
+  margin-left: 8px;
+  box-shadow: 0 4px 10px rgba(255, 170, 200, .2);
+  transition: all 0.2s ease;
 }
-#receiverLink {
-  display: inline-block;
-  word-break: break-all;
-  color: #e2528e;
-  text-decoration: none;
-  font-weight: 500;
-}
-#receiverLink:hover { text-decoration: underline; }
 
-#qrCanvas { display: flex; justify-content: center; margin-top: 10px; }
-#qrCanvas canvas, #qrCanvas img { display: block; margin: 0 auto; }
+.btn-secondary:hover {
+  filter: brightness(.98);
+  transform: translateY(-1px);
+}
+
+/* 🌸 Phần ghi âm */
+.rec-box {
+  background: #fff5f9;
+  border-radius: 14px;
+  margin-top: 16px;
+  padding: 14px;
+  animation: fadeIn 0.5s ease;
+  box-shadow: inset 0 0 6px rgba(255, 150, 180, 0.15);
+}
+
+.rec-box audio {
+  width: 100%;
+  margin-top: 10px;
+}
+
+/* 💌 Vùng QR */
+.result-box {
+  background: #fff9fb;
+  border-radius: 16px;
+  padding: 20px;
+  margin-top: 18px;
+  box-shadow: 0 3px 10px rgba(255, 180, 200, 0.15);
+}
+
+.result-box a {
+  color: #d63384;
+  word-break: break-all;
+}
+
+.qr-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 💗 Tim bay */
+.heart {
+  position: fixed;
+  bottom: -20px;
+  width: 14px;
+  height: 14px;
+  background: pink;
+  border-radius: 50%;
+  animation: float 6s linear infinite;
+  opacity: 0.8;
+}
+
+@keyframes float {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(-100vh) scale(0.8); opacity: 0; }
+}
+
+/* 📱 Mobile */
+@media (max-width: 640px) {
+  body {
+    padding-top: 28px;
+  }
+
+  .card {
+    width: 92%;
+    padding: 24px 18px 36px;
+  }
+
+  .card h1 {
+    font-size: 1.4rem;
+  }
+
+  .play {
+    width: 100%;
+  }
+
+  .btn-secondary {
+    width: 100%;
+    margin: 6px 0;
+  }
+}
