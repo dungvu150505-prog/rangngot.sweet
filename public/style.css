@@ -1,0 +1,132 @@
+body {
+  font-family: 'EB Garamond', serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  margin: 0;
+  background: linear-gradient(145deg, #fff7fa, #ffeef5);
+  color: #333;
+  overflow: hidden;
+}
+
+/* 🌸 Logo hình tròn */
+.logo {
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 8px;
+  box-shadow: 0 4px 14px rgba(255, 160, 180, 0.35);
+  animation: heartbeat 3s ease-in-out infinite;
+}
+
+/* 💞 Hiệu ứng nhịp tim */
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); }
+  25% { transform: scale(1.05); }
+  50% { transform: scale(1.1); }
+  75% { transform: scale(1.05); }
+}
+
+/* ✨ Slogan */
+.slogan {
+  font-size: 1rem;
+  color: #d32f2f;
+  font-style: italic;
+  font-weight: 500;
+  opacity: 0.95;
+  margin-bottom: 24px;
+  animation: fadeIn 2s ease;
+}
+@keyframes fadeIn { from {opacity:0; transform:translateY(-8px);} to {opacity:1; transform:translateY(0);} }
+
+/* 🎀 Thiệp */
+.card {
+  position: relative;
+  z-index: 1;
+  width: clamp(320px, 90vw, 520px);
+  padding: 36px;
+  border-radius: 24px;
+  box-shadow: 0 8px 28px rgba(255, 170, 200, 0.25);
+  background: rgba(255, 255, 255, 0.92);
+  text-align: center;
+  border: 1px solid #ffd6e6;
+  backdrop-filter: blur(6px);
+}
+
+h1 {
+  margin: 0 0 14px;
+  font-size: 1.5rem;
+  color: #e2528e;
+  font-weight: 700;
+}
+
+p {
+  margin: 0 0 22px;
+  color: #555;
+  font-size: 1.05rem;
+  line-height: 1.5;
+}
+
+.play {
+  font-size: 1.05rem;
+  padding: 14px 22px;
+  border-radius: 14px;
+  border: none;
+  background: #ff93b8;
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 6px 12px rgba(255, 122, 162, 0.25);
+  transition: all 0.3s ease;
+  font-family: 'EB Garamond', serif;
+}
+.play:hover { background: #ff79a4; transform: scale(1.05); }
+
+.note { margin-top: 16px; font-size: 0.9rem; color: #888; }
+
+/* 💗 Trái tim hồng bay */
+.heart {
+  position: absolute;
+  bottom: -20px;
+  width: 16px; height: 16px;
+  background-color: #ff9ebd;
+  transform: rotate(45deg);
+  opacity: 0.8;
+  animation: floatUp 6s ease-in infinite;
+}
+.heart::before, .heart::after {
+  content: "";
+  position: absolute;
+  width: 16px; height: 16px;
+  background-color: #ff9ebd; border-radius: 50%;
+}
+.heart::before { top: -8px; left: 0; }
+.heart::after  { left: -8px; top: 0; }
+@keyframes floatUp {
+  0% { transform: translateY(0) scale(1) rotate(45deg); opacity: 1; }
+  50% { transform: translateY(-150px) scale(1.2) rotate(45deg); opacity: 0.9; }
+  100% { transform: translateY(-250px) scale(0.9) rotate(45deg); opacity: 0; }
+}
+
+/* ✅ Căn giữa khu vực kết quả + QR */
+.result-box { 
+  margin-top: 18px;
+  background: #fff6f9;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 2px 8px rgba(255, 180, 210, 0.2);
+  text-align: center;
+}
+#receiverLink {
+  display: inline-block;
+  word-break: break-all;
+  color: #e2528e;
+  text-decoration: none;
+  font-weight: 500;
+}
+#receiverLink:hover { text-decoration: underline; }
+
+#qrCanvas { display: flex; justify-content: center; margin-top: 10px; }
+#qrCanvas canvas, #qrCanvas img { display: block; margin: 0 auto; }

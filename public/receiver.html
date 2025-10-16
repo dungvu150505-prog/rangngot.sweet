@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Một chút ngọt ngào gửi tới bạn</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+  <!-- 🍰 Logo + slogan -->
+  <img src="https://file.garden/aO0lFjCQS03opF7T/st.PNG" alt="Logo RangNgot" class="logo">
+  <div class="slogan">From RangNgot with Love 💞</div>
+
+  <!-- 🎀 Thiệp -->
+  <div class="card">
+    <h1>Một chút ngọt ngào gửi tới bạn</h1>
+    <p>Đây là đôi lời ngọt ngào từ một người đặc biệt muốn dành tặng cho bạn nhân dịp 20/10. Nhấn play để nghe lời chúc nhé 🎀</p>
+
+    <!-- Không đặt src mặc định; sẽ gán từ query -->
+    <audio id="player" preload="auto">
+      <source id="audioSource" type="audio/mpeg">
+      Trình duyệt của bạn không hỗ trợ phát âm thanh.
+    </audio>
+
+    <button class="play" id="btnPlay">🎧 Nghe lời chúc</button>
+    <div class="note" id="note">Nếu không tự phát, hãy bấm nút ở trên nhé</div>
+  </div>
+
+  <script>
+    const btn    = document.getElementById('btnPlay');
+    const note   = document.getElementById('note');
+    const player = document.getElementById('player');
+    const source = document.getElementById('audioSource');
+
+    // Lấy URL âm thanh từ: /receiver.html?audio=/uploads/<file>
+    const params   = new URLSearchParams(window.location.search);
+    const audioURL = params.get('audio');
+
+    if (audioURL) {
+      source.src = audioURL;
+      player.load(); // bắt trình duyệt nạp nguồn mới
+    } else {
+      btn.disabled = true;
+      btn.textContent = '❌ Không tìm thấy file âm thanh';
+      note.textContent = 'Hãy kiểm tra lại link nhận hoặc nhờ người gửi gửi lại nhé.';
+    }
+
+    btn.addEventListener('click', () => {
+      if (!audioURL) return;
+      if (player.paused) {
+        player.play()
+          .then(() => { btn.textContent = '⏸ Dừng lại'; })
+          .catch(() => alert('Trình duyệt chặn tự phát, bấm lại để phát nhé.'));
+      } else {
+        player.pause(); player.currentTime = 0; btn.textContent = '🎧 Nghe lời chúc';
+      }
+    });
+
+    // 💗 Tim bay ngẫu nhiên
+    setInterval(() => {
+      const heart = document.createElement('div');
+      heart.classList.add('heart');
+      heart.style.left = Math.random() * 100 + 'vw';
+      heart.style.animationDuration = (3 + Math.random() * 3) + 's';
+      heart.style.backgroundColor = `hsl(${340 + Math.random() * 20}, 90%, 75%)`;
+      document.body.appendChild(heart);
+      setTimeout(() => heart.remove(), 6000);
+    }, 800);
+  </script>
+</body>
+</html>

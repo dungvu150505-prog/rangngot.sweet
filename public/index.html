@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Gửi lời chúc - Răng Ngọt</title>
+  <link rel="stylesheet" href="/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+</head>
+
+<body>
+  <!-- 🍰 Logo + slogan -->
+  <img src="https://file.garden/aO0lFjCQS03opF7T/st.PNG" alt="Logo RangNgot" class="logo">
+  <div class="slogan">From RangNgot with Love 💞</div>
+
+  <!-- 🎀 Thiệp chính -->
+  <div class="card">
+    <h1>Gửi chút ngọt ngào đến người bạn thương 💌</h1>
+    <p>Hãy nói lời yêu thương của bạn, chúng mình sẽ gói lại thật xinh và gửi tới người đặc biệt dịp 20/10 💖</p>
+
+    <input type="file" id="audioFile" accept="audio/*" hidden />
+    <button id="uploadBtn" class="play">🍰 Gửi lời chúc ngay</button>
+
+    <div id="result" class="result-box" style="display:none;">
+      <p>✨ Link người nhận của bạn:</p>
+      <a id="receiverLink" target="_blank"></a>
+      <div id="qrCanvas"></div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = window.API_BASE || '';
+    const uploadBtn = document.getElementById('uploadBtn');
+    const fileInput = document.getElementById('audioFile');
+    const resultBox = document.getElementById('result');
+    const receiverLink = document.getElementById('receiverLink');
+    const qrCanvas = document.getElementById('qrCanvas');
+
+    uploadBtn.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', async () => {
+      if (!fileInput.files.length) return;
+      uploadBtn.disabled = true;
+      uploadBtn.textContent = 'Đang gửi yêu thương...';
+
+      const formData = new FormData();
+      formData.append('audio', fileInput.files[0]);
+
+      try {
+        const response = await fetch(`${API_BASE}/upload`, { method: 'POST', body: formData });
+        const data = await response.json();
+
+        if (data.success) {
+          const fullURL = data.absoluteReceiverUrl || `${window.location.origin}${data.receiverUrl}`;
+          receiverLink.textContent = fullURL;
+          receiverLink.href = fullURL;
+
+          qrCanvas.innerHTML = '';
+          new QRCode(qrCanvas, { text: fullURL, width: 120, height: 120, colorDark: '#e2528e', colorLight: '#fff7fa' });
+          resultBox.style.display = 'block';
+        } else {
+          alert(data.message || 'Lỗi khi tải file.');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Đã xảy ra lỗi khi kết nối máy chủ.');
+      } finally {
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = '🍰 Gửi lời chúc ngay';
+      }
+    });
+
+    // 💗 Tim bay ngẫu nhiên
+    setInterval(() => {
+      const heart = document.createElement('div');
+      heart.classList.add('heart');
+      heart.style.left = Math.random() * 100 + 'vw';
+      heart.style.animationDuration = (3 + Math.random() * 3) + 's';
+      heart.style.backgroundColor = `hsl(${340 + Math.random() * 20}, 90%, 75%)`;
+      document.body.appendChild(heart);
+      setTimeout(() => heart.remove(), 6000);
+    }, 800);
+  </script>
+</body>
+</html>
