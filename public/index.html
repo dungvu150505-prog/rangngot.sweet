@@ -9,7 +9,6 @@
   <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
   <style>
-    /* nút phụ và khu record nhỏ gọn */
     .btn-secondary { background:#ffd1e1; color:#a83f6b; border:none; border-radius:12px; padding:10px 16px; cursor:pointer; margin-left:8px; box-shadow:0 4px 10px rgba(255,170,200,.2); }
     .btn-secondary:hover { filter:brightness(.98); transform:translateY(-1px); }
     .actions { display:flex; justify-content:center; gap:8px; flex-wrap:wrap; }
@@ -20,16 +19,13 @@
 </head>
 
 <body>
-  <!-- 🍰 Logo + slogan -->
   <img src="https://file.garden/aO0lFjCQS03opF7T/st.PNG" alt="Logo RangNgot" class="logo">
   <div class="slogan">From RangNgot with Love 💞</div>
 
-  <!-- 🎀 Thiệp chính -->
   <div class="card">
     <h1>Gửi chút ngọt ngào đến người bạn thương 💌</h1>
     <p>Hãy nói lời yêu thương của bạn, chúng mình sẽ gói lại thật xinh và gửi tới người đặc biệt dịp 20/10 💖</p>
 
-    <!-- Chọn file: audio HOẶC video (thân thiện iPhone) -->
     <input type="file" id="filePicker" accept="audio/*,video/*" hidden />
     <div class="actions">
       <button id="btnPick" class="play">📤 Tải file (audio/video)</button>
@@ -37,7 +33,6 @@
     </div>
     <div class="small-note">iPhone: nếu không thấy file trong “Ảnh”, hãy chọn “Tệp” (Files) hoặc dùng nút <b>Ghi âm trực tiếp</b>.</div>
 
-    <!-- Khu điều khiển ghi âm -->
     <div id="recPanel" class="rec-box" style="display:none;">
       <span id="recStatus">Đang chờ…</span>
       <div style="margin-top:8px;">
@@ -48,7 +43,6 @@
       <audio id="recPreview" controls style="margin-top:8px; display:none;"></audio>
     </div>
 
-    <!-- Kết quả -->
     <div id="result" class="result-box" style="display:none;">
       <p>✨ Link người nhận của bạn:</p>
       <a id="receiverLink" target="_blank"></a>
@@ -64,7 +58,6 @@
     const API_BASE = window.API_BASE || '';
     const picker = document.getElementById('filePicker');
     const btnPick = document.getElementById('btnPick');
-
     const btnRecord = document.getElementById('btnRecord');
     const recPanel = document.getElementById('recPanel');
     const btnStartRec = document.getElementById('btnStartRec');
@@ -72,24 +65,20 @@
     const recStatus = document.getElementById('recStatus');
     const recTimer = document.getElementById('recTimer');
     const recPreview = document.getElementById('recPreview');
-
     const resultBox = document.getElementById('result');
     const receiverLink = document.getElementById('receiverLink');
     const qrCanvas = document.getElementById('qrCanvas');
     const btnDownloadQR = document.getElementById('btnDownloadQR');
     const btnCopyLink = document.getElementById('btnCopyLink');
-
     let mediaStream, mediaRecorder, recChunks = [], recInterval, recSeconds = 0;
 
-    // Nút tải file
     btnPick.addEventListener('click', () => picker.click());
     picker.addEventListener('change', async () => {
       if (!picker.files.length) return;
       await uploadFile(picker.files[0]);
-      picker.value = ''; // reset
+      picker.value = '';
     });
 
-    // Nút mở panel ghi âm
     btnRecord.addEventListener('click', async () => {
       recPanel.style.display = 'block';
       if (!navigator.mediaDevices?.getUserMedia) {
@@ -100,11 +89,9 @@
       recStatus.textContent = 'Sẵn sàng ghi âm bằng micro thiết bị.';
     });
 
-    // Bắt đầu ghi
     btnStartRec.addEventListener('click', async () => {
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // Chọn mime phù hợp (Safari/iOS thường hỗ trợ audio/mp4 hoặc webm; ta thử lần lượt)
         const mimeCandidates = ['audio/webm', 'audio/mp4', 'audio/ogg'];
         let mimeType = '';
         for (const m of mimeCandidates) {
@@ -114,16 +101,12 @@
         recChunks = [];
         mediaRecorder.ondataavailable = e => e.data.size && recChunks.push(e.data);
         mediaRecorder.onstop = async () => {
-          // Tạo blob -> File -> upload
           const blob = new Blob(recChunks, { type: mimeType || 'audio/webm' });
           recPreview.src = URL.createObjectURL(blob);
           recPreview.style.display = 'block';
-
-          // Tạo tên file đẹp
           const ext = (mimeType && mimeType.includes('mp4')) ? 'm4a' :
                       (mimeType && mimeType.includes('ogg')) ? 'ogg' : 'webm';
           const file = new File([blob], `voice-${Date.now()}.${ext}`, { type: blob.type });
-
           await uploadFile(file);
           cleanupRecording();
         };
@@ -132,7 +115,6 @@
         recStatus.textContent = 'Đang ghi…';
         btnStartRec.disabled = true;
         btnStopRec.disabled = false;
-
         recSeconds = 0;
         recTimer.textContent = '00:00';
         recInterval = setInterval(() => {
@@ -148,11 +130,8 @@
       }
     });
 
-    // Dừng & gửi
     btnStopRec.addEventListener('click', () => {
-      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        mediaRecorder.stop();
-      }
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
       if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
       clearInterval(recInterval);
       btnStopRec.disabled = true;
@@ -167,26 +146,19 @@
       btnStopRec.disabled = true;
     }
 
-    // Hàm upload dùng chung cho file picker & ghi âm
     async function uploadFile(file) {
       btnPick.disabled = true;
       btnRecord.disabled = true;
       btnPick.textContent = 'Đang gửi yêu thương…';
-
       const formData = new FormData();
-      // Server field name = 'audio' (giữ nguyên cho audio hoặc video)
       formData.append('audio', file);
-
       try {
         const res = await fetch(`${API_BASE}/upload`, { method: 'POST', body: formData });
         const data = await res.json();
         if (!data.success) throw new Error(data.message || 'Upload thất bại');
-
         const fullURL = data.absoluteReceiverUrl || `${location.origin}${data.receiverUrl}`;
         receiverLink.textContent = fullURL;
         receiverLink.href = fullURL;
-
-        // Tạo QR
         qrCanvas.innerHTML = '';
         new QRCode(qrCanvas, { text: fullURL, width: 180, height: 180, colorDark: '#e2528e', colorLight: '#fff7fa' });
         resultBox.style.display = 'block';
@@ -200,15 +172,11 @@
       }
     }
 
-    // Tải QR về máy
     btnDownloadQR.addEventListener('click', () => {
       const cvs = qrCanvas.querySelector('canvas');
       const img = qrCanvas.querySelector('img');
-      let dataURL = '';
-      if (cvs && cvs.toDataURL) dataURL = cvs.toDataURL('image/png');
-      else if (img && img.src) dataURL = img.src;
+      let dataURL = cvs?.toDataURL?.('image/png') || img?.src || '';
       if (!dataURL) return alert('Không tìm thấy QR để tải.');
-
       const a = document.createElement('a');
       a.href = dataURL;
       a.download = 'qr-rangngot.png';
@@ -217,11 +185,9 @@
       a.remove();
     });
 
-    // Copy link
     btnCopyLink.addEventListener('click', async () => {
-      const url = receiverLink.href;
       try {
-        await navigator.clipboard.writeText(url);
+        await navigator.clipboard.writeText(receiverLink.href);
         btnCopyLink.textContent = '✅ Đã copy';
         setTimeout(() => btnCopyLink.textContent = '🔗 Copy link', 1500);
       } catch {
@@ -229,7 +195,6 @@
       }
     });
 
-    // 💗 Tim bay ngẫu nhiên
     setInterval(() => {
       const heart = document.createElement('div');
       heart.classList.add('heart');
