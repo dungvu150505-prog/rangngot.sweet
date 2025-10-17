@@ -5,14 +5,25 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Gửi lời chúc - Răng Ngọt</title>
 
-  <!-- Style chung -->
+  <!-- CSS chính -->
   <link rel="stylesheet" href="/style.css">
-  <!-- Font -->
+  <!-- EB Garamond -->
   <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <!-- QR -->
+  <!-- QRCode -->
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
-  <!-- Một ít CSS nhỏ chỉ dành cho trang gửi (phần nút phụ/record) -->
+
+  <!-- Bổ sung fix (font đồng bộ + tim bay + căn QR) -->
   <style>
+    /* Đồng bộ font cho mọi control & text */
+    html, body, button, input, textarea, select, a, p, h1, h2, h3, h4, h5 {
+      font-family: 'EB Garamond', serif !important;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    button, input[type="button"], input[type="submit"] { -webkit-appearance: none; appearance: none; }
+    .play, .btn-secondary { font-family: inherit !important; font-weight: 600; letter-spacing: .2px; }
+
+    /* Nút phụ & record nhỏ gọn */
     .actions { display:flex; justify-content:center; gap:8px; flex-wrap:wrap; }
     .small-note { font-size:.9rem; color:#888; margin-top:8px; }
     .rec-box { background:#fff5f9; border-radius:14px; margin-top:16px; padding:14px; box-shadow: inset 0 0 6px rgba(255,150,180,.15); }
@@ -20,6 +31,24 @@
     .rec-timer { margin-left:8px; min-width:48px; display:inline-block; }
     #qrCanvas { margin:12px auto 0; display:flex; justify-content:center; }
     .qr-actions { margin-top:8px; display:flex; justify-content:center; gap:8px; flex-wrap:wrap; }
+
+    /* Trái tim bay từ dưới màn hình (sửa lỗi thành hình tròn) */
+    .heart{
+      position:fixed; bottom:-20px; width:18px; height:18px;
+      background:#fba4c2; transform:rotate(45deg); animation:flyUp 6s linear infinite; z-index:0;
+    }
+    .heart::before,.heart::after{
+      content:""; position:absolute; width:18px; height:18px; background:#fba4c2; border-radius:50%;
+    }
+    .heart::before{ top:-9px; left:0; }
+    .heart::after{ top:0; left:-9px; }
+    @keyframes flyUp{
+      0%{ transform:translateY(0) rotate(45deg); opacity:1; }
+      100%{ transform:translateY(-100vh) rotate(45deg); opacity:0; }
+    }
+
+    /* Vô hiệu hóa hiệu ứng blur cũ nếu có class này (tránh làm mờ cả panel) */
+    body.recording-active { filter:none !important; }
   </style>
 </head>
 
@@ -33,10 +62,10 @@
     <h1>Gửi chút ngọt ngào đến người bạn thương 💌</h1>
     <p>Hãy nói lời yêu thương của bạn, chúng mình sẽ gói lại thật xinh và gửi tới người đặc biệt dịp 20/10 💖</p>
 
-    <!-- Chọn file: audio HOẶC video (thân thiện iPhone) -->
-    <input type="file" id="filePicker" accept="audio/*,video/*" hidden />
+    <!-- Cho phép audio / video / ảnh -->
+    <input type="file" id="filePicker" accept="audio/*,video/*,image/*" hidden />
     <div class="actions">
-      <button id="btnPick" class="play">📤 Tải file (audio/video)</button>
+      <button id="btnPick" class="play">📤 Tải file (audio/video/ảnh)</button>
       <button id="btnRecord" class="btn-secondary">🎙️ Ghi âm trực tiếp</button>
     </div>
     <div class="small-note">iPhone: nếu không thấy file trong “Ảnh”, hãy chọn “Tệp” (Files) hoặc dùng nút <b>Ghi âm trực tiếp</b>.</div>
@@ -49,7 +78,7 @@
         <button id="btnStopRec" class="btn-secondary" disabled>⏹ Dừng & gửi</button>
         <span id="recTimer" class="rec-timer">00:00</span>
       </div>
-      <audio id="recPreview" controls style="margin-top:10px; display:none;"></audio>
+      <audio id="recPreview" controls style="margin-top:10px; display:none; width:100%;"></audio>
     </div>
 
     <!-- Kết quả -->
@@ -65,7 +94,6 @@
   </div>
 
   <script>
-    // Nếu deploy trên Render có set PUBLIC_BASE_URL trong server, server sẽ trả absoluteReceiverUrl
     const API_BASE = window.API_BASE || '';
 
     // DOM
@@ -89,9 +117,8 @@
     // State ghi âm
     let mediaStream, mediaRecorder, recChunks = [], recInterval, recSeconds = 0;
 
-    // ===== Upload file (audio/video) =====
+    // ===== Upload file (audio/video/ảnh) =====
     btnPick.addEventListener('click', () => picker.click());
-
     picker.addEventListener('change', async () => {
       if (!picker.files.length) return;
       await uploadFile(picker.files[0]);
@@ -113,9 +140,10 @@
     btnStartRec.addEventListener('click', async () => {
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        document.body.classList.add('recording-active'); // 🌸 làm mờ nền
+        // (Không blur trang để tránh mờ panel)
+        // document.body.classList.add('recording-active');
 
-        // Chọn mime khả dụng (Safari/iOS thường: audio/mp4; Chrome: audio/webm)
+        // Chọn mime khả dụng
         const mimeCandidates = ['audio/webm', 'audio/mp4', 'audio/ogg'];
         let mimeType = '';
         for (const m of mimeCandidates) {
@@ -126,7 +154,6 @@
         recChunks = [];
         mediaRecorder.ondataavailable = e => e.data?.size && recChunks.push(e.data);
         mediaRecorder.onstop = async () => {
-          // Tạo file từ blob
           const blob = new Blob(recChunks, { type: mimeType || 'audio/webm' });
           recPreview.src = URL.createObjectURL(blob);
           recPreview.style.display = 'block';
@@ -137,7 +164,7 @@
           const file = new File([blob], `voice-${Date.now()}.${ext}`, { type: blob.type });
 
           await uploadFile(file);
-          document.body.classList.remove('recording-active'); // 🌸 tắt mờ sau khi gửi xong
+          // document.body.classList.remove('recording-active');
           cleanupRecording();
         };
 
@@ -158,7 +185,7 @@
 
       } catch (e) {
         console.error(e);
-        document.body.classList.remove('recording-active');
+        // document.body.classList.remove('recording-active');
         recStatus.textContent = 'Không truy cập được micro. Hãy cấp quyền hoặc dùng cách tải file.';
       }
     });
@@ -172,7 +199,7 @@
       clearInterval(recInterval);
       btnStopRec.disabled = true;
       recStatus.textContent = 'Đang xử lý…';
-      document.body.classList.remove('recording-active'); // 🌸 tắt mờ ngay khi dừng
+      // document.body.classList.remove('recording-active');
     });
 
     function cleanupRecording() {
@@ -191,7 +218,7 @@
       btnPick.textContent = 'Đang gửi yêu thương…';
 
       const formData = new FormData();
-      // Trường tên 'audio' để server nhận (dù file là audio hay video)
+      // Trường tên 'audio' để server nhận (dù file là audio/video/ảnh)
       formData.append('audio', file);
 
       try {
@@ -208,7 +235,7 @@
         qrCanvas.innerHTML = '';
         new QRCode(qrCanvas, { text: fullURL, width: 200, height: 200, colorDark: '#e2528e', colorLight: '#fff7fa' });
         resultBox.style.display = 'block';
-        // Cuộn xuống phần kết quả cho dễ thấy trên mobile
+        // Cuộn xuống phần kết quả
         resultBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
       } catch (err) {
@@ -228,8 +255,7 @@
       let dataURL = cvs?.toDataURL?.('image/png') || img?.src || '';
       if (!dataURL) return alert('Không tìm thấy QR để tải.');
       const a = document.createElement('a');
-      a.href = dataURL;
-      a.download = 'qr-rangngot.png';
+      a.href = dataURL; a.download = 'qr-rangngot.png';
       document.body.appendChild(a); a.click(); a.remove();
     });
 
@@ -244,16 +270,16 @@
       }
     });
 
-    // 💗 Tim bay ngẫu nhiên
+    // 💗 Tim bay ngẫu nhiên (từ dưới lên, đúng hình tim)
     setInterval(() => {
       const heart = document.createElement('div');
       heart.classList.add('heart');
       heart.style.left = Math.random() * 100 + 'vw';
-      heart.style.animationDuration = (3 + Math.random() * 3) + 's';
+      heart.style.animationDuration = (4 + Math.random() * 3) + 's';
       heart.style.backgroundColor = `hsl(${340 + Math.random() * 20}, 90%, 75%)`;
       document.body.appendChild(heart);
-      setTimeout(() => heart.remove(), 6000);
-    }, 800);
+      setTimeout(() => heart.remove(), 7000);
+    }, 900);
   </script>
 </body>
 </html>
