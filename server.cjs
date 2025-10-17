@@ -18,17 +18,25 @@ const UPLOAD_DIR = path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/uploads', express.static(UPLOAD_DIR, { setHeaders: r => r.setHeader('Accept-Ranges','bytes') }));
+app.use('/uploads', express.static(UPLOAD_DIR, {
+  setHeaders: (res) => res.setHeader('Accept-Ranges', 'bytes')
+}));
 
-// Lưu map shortURL -> đường dẫn file, có PERSIST vào uploads/map.json
+// Lưu map shortURL -> đường dẫn file (persist vào uploads/map.json)
 const MAP_PATH = path.join(UPLOAD_DIR, 'map.json');
 let urlMap = {};
 try {
-  if (fs.existsSync(MAP_PATH)) urlMap = JSON.parse(fs.readFileSync(MAP_PATH, 'utf8') || '{}');
-} catch { urlMap = {}; }
-const saveMap = () => { try { fs.writeFileSync(MAP_PATH, JSON.stringify(urlMap, null, 2)); } catch {} };
+  if (fs.existsSync(MAP_PATH)) {
+    urlMap = JSON.parse(fs.readFileSync(MAP_PATH, 'utf8') || '{}');
+  }
+} catch {
+  urlMap = {};
+}
+const saveMap = () => {
+  try { fs.writeFileSync(MAP_PATH, JSON.stringify(urlMap, null, 2)); } catch {}
+};
 
-// Multer: nhận audio hoặc video, giới hạn 30MB
+// Multer: nhận ảnh / audio / video, giới hạn 30MB
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOAD_DIR),
   filename: (req, file, cb) => {
@@ -38,21 +46,35 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
   storage,
-  limits: { fileSize: 30 * 1024 * 1024 },
+  limits: { fileSize: 30 * 1024 * 1024 }, // ~30MB
   fileFilter: (req, file, cb) => {
     const type = (file.mimetype || '');
-    if (type.startsWith('audio/') || type.startsWith('video/')) cb(null, true);
-    else cb(new Error('Chỉ nhận file âm thanh hoặc video'));
+    if (
+      type.startsWith('image/') ||
+      type.startsWith('audio/') ||
+      type.startsWith('video/')
+    ) cb(null, true);
+    else cb(new Error('Chỉ nhận ảnh, âm thanh hoặc video'));
   }
 });
 
 // API: Upload -> trả link ngắn
-app.post('/upload', upload.single('audio'), (req, res) => {
-  if (!req.file) return res.status(400).json({ success: false, message: 'Không có file' });
+// Hỗ trợ cả 'audio' (cũ) và 'file' (mới)
+const fieldsMiddleware = upload.fields([{ name: 'audio', maxCount: 1 }, { name: 'file', maxCount: 1 }]);
+
+app.post('/upload', fieldsMiddleware, (req, res) => {
+  const picked =
+    (req.files && req.files.audio && req.files.audio[0]) ||
+    (req.files && req.files.file && req.files.file[0]) ||
+    null;
+
+  if (!picked) {
+    return res.status(400).json({ success: false, message: 'Không có file' });
+  }
 
   const shortId = (Date.now().toString(36) + Math.random().toString(36).slice(2, 6)).toLowerCase();
   const shortPath = `/r/${shortId}`;
-  const filePath = '/uploads/' + req.file.filename;
+  const filePath = '/uploads/' + picked.filename;
 
   urlMap[shortId] = filePath;
   saveMap();
@@ -64,11 +86,11 @@ app.post('/upload', upload.single('audio'), (req, res) => {
   });
 });
 
-// Mở link ngắn -> chuyển sang trang nhận
+// Mở link ngắn -> chuyển sang trang nhận (dùng param 'file' tổng quát)
 app.get('/r/:id', (req, res) => {
   const filePath = urlMap[req.params.id];
   if (!filePath) return res.status(404).send('Liên kết không tồn tại hoặc đã hết hạn 😢');
-  res.redirect(`/receiver.html?audio=${encodeURIComponent(filePath)}`);
+  res.redirect(`/receiver.html?file=${encodeURIComponent(filePath)}`);
 });
 
 // Fallback

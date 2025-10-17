@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Một chút ngọt ngào gửi tới bạn</title>
 
+  <!-- Font + style chung -->
   <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
 </head>
@@ -17,49 +18,116 @@
   <!-- 🎀 Thiệp -->
   <div class="card">
     <h1>Một chút ngọt ngào gửi tới bạn</h1>
-    <p>Đây là đôi lời ngọt ngào từ một người đặc biệt muốn dành tặng cho bạn nhân dịp 20/10. Nhấn play để nghe lời chúc nhé 🎀</p>
+    <p id="desc">Đây là đôi lời ngọt ngào từ một người đặc biệt muốn dành tặng cho bạn nhân dịp 20/10. Nhấn nút bên dưới để xem/nghe nhé 🎀</p>
 
-    <!-- Không đặt src mặc định; sẽ gán từ query -->
-    <audio id="player" preload="auto">
-      <source id="audioSource" type="audio/mpeg">
-      Trình duyệt của bạn không hỗ trợ phát âm thanh.
-    </audio>
+    <!-- Vùng hiển thị media động -->
+    <div id="mediaWrap" style="margin-top:8px;"></div>
 
-    <button class="play" id="btnPlay">🎧 Nghe lời chúc</button>
+    <!-- Nút hành động (tuỳ loại file mà đổi chức năng) -->
+    <button class="play" id="actionBtn">🎧 Nghe lời chúc</button>
     <div class="note" id="note">Nếu không tự phát, hãy bấm nút ở trên nhé</div>
   </div>
 
   <script>
-    const btn    = document.getElementById('btnPlay');
-    const note   = document.getElementById('note');
-    const player = document.getElementById('player');
-    const source = document.getElementById('audioSource');
+    const actionBtn = document.getElementById('actionBtn');
+    const note      = document.getElementById('note');
+    const desc      = document.getElementById('desc');
+    const mediaWrap = document.getElementById('mediaWrap');
 
-    // Lấy URL âm thanh từ: /receiver.html?audio=/uploads/<file>
-    const params   = new URLSearchParams(window.location.search);
-    const audioURL = params.get('audio');
+    // Chấp nhận nhiều tên tham số để tương thích: ?audio=, ?file=, ?src=, ?url=
+    const params = new URLSearchParams(location.search);
+    const fileURL = params.get('audio') || params.get('file') || params.get('src') || params.get('url');
 
-    if (audioURL) {
-      source.src = audioURL;
-      player.load(); // bắt trình duyệt nạp nguồn mới
-    } else {
-      btn.disabled = true;
-      btn.textContent = '❌ Không tìm thấy file âm thanh';
-      note.textContent = 'Hãy kiểm tra lại link nhận hoặc nhờ người gửi gửi lại nhé.';
+    // Phân loại theo đuôi file
+    function detectType(url) {
+      if (!url) return 'unknown';
+      const clean = url.split('?')[0].split('#')[0];
+      const ext = (clean.split('.').pop() || '').toLowerCase();
+      const IMG = ['png','jpg','jpeg','gif','webp','bmp','svg','heic','heif','avif'];
+      const VID = ['mp4','webm','ogg','mov','m4v','3gp','3gpp'];
+      const AUD = ['mp3','wav','aac','m4a','ogg','oga','flac','webm'];
+      if (IMG.includes(ext)) return 'image';
+      if (VID.includes(ext)) return 'video';
+      if (AUD.includes(ext)) return 'audio';
+      // Không rõ đuôi -> ưu tiên audio (tương thích cũ)
+      return 'audio';
     }
 
-    btn.addEventListener('click', () => {
-      if (!audioURL) return;
-      if (player.paused) {
-        player.play()
-          .then(() => { btn.textContent = '⏸ Dừng lại'; })
-          .catch(() => alert('Trình duyệt chặn tự phát, bấm lại để phát nhé.'));
-      } else {
-        player.pause(); player.currentTime = 0; btn.textContent = '🎧 Nghe lời chúc';
-      }
-    });
+    // Tạo phần tử media tương ứng
+    let mediaEl = null;
+    const kind = detectType(fileURL);
 
-    // 💗 Tim bay ngẫu nhiên
+    if (!fileURL) {
+      actionBtn.disabled = true;
+      actionBtn.textContent = '❌ Không tìm thấy nội dung';
+      note.textContent = 'Hãy kiểm tra lại link nhận hoặc nhờ người gửi gửi lại nhé.';
+    } else {
+      if (kind === 'image') {
+        // Ảnh
+        mediaEl = new Image();
+        mediaEl.src = fileURL;
+        mediaEl.alt = 'Ảnh lời chúc';
+        mediaEl.style.maxWidth = '100%';
+        mediaEl.style.borderRadius = '12px';
+        mediaEl.style.boxShadow = '0 6px 18px rgba(255,150,180,.18)';
+        mediaWrap.appendChild(mediaEl);
+
+        actionBtn.textContent = '⬇️ Tải ảnh về máy';
+        note.textContent = 'Chúc bạn một ngày thật ngọt ngào 🍰';
+        actionBtn.onclick = () => {
+          const a = document.createElement('a');
+          a.href = fileURL;
+          a.download = 'rangngot-image';
+          document.body.appendChild(a); a.click(); a.remove();
+        };
+      } else if (kind === 'video') {
+        // Video
+        mediaEl = document.createElement('video');
+        mediaEl.src = fileURL;
+        mediaEl.controls = true;
+        mediaEl.preload = 'metadata';
+        mediaEl.playsInline = true;
+        mediaEl.style.width = '100%';
+        mediaEl.style.borderRadius = '12px';
+        mediaEl.style.boxShadow = '0 6px 18px rgba(255,150,180,.18)';
+        mediaWrap.appendChild(mediaEl);
+
+        actionBtn.textContent = '▶️ Phát video';
+        note.textContent = 'Nếu không phát, bấm nút để xem nhé.';
+        actionBtn.onclick = () => {
+          if (mediaEl.paused) {
+            mediaEl.play().then(() => actionBtn.textContent = '⏸ Tạm dừng').catch(()=>{});
+          } else {
+            mediaEl.pause();
+            actionBtn.textContent = '▶️ Phát video';
+          }
+        };
+      } else {
+        // Audio (mặc định/ tương thích cũ)
+        mediaEl = document.createElement('audio');
+        mediaEl.preload = 'auto';
+        mediaEl.src = fileURL;
+        mediaEl.style.display = 'none'; // nút chính sẽ điều khiển phát
+        mediaEl.setAttribute('controls', ''); // vẫn thêm để người dùng có thể mở nếu muốn
+        mediaWrap.appendChild(mediaEl);
+
+        actionBtn.textContent = '🎧 Nghe lời chúc';
+        note.textContent = 'Nếu không tự phát, hãy bấm nút ở trên nhé';
+        actionBtn.onclick = () => {
+          if (mediaEl.paused) {
+            mediaEl.play()
+              .then(() => actionBtn.textContent = '⏸ Dừng lại')
+              .catch(() => alert('Trình duyệt chặn tự phát, bấm lại để phát nhé.'));
+          } else {
+            mediaEl.pause();
+            mediaEl.currentTime = 0;
+            actionBtn.textContent = '🎧 Nghe lời chúc';
+          }
+        };
+      }
+    }
+
+    // 💗 Tim bay ngẫu nhiên (đáy màn hình)
     setInterval(() => {
       const heart = document.createElement('div');
       heart.classList.add('heart');

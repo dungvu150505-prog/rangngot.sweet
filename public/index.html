@@ -73,15 +73,15 @@
     <h1>Gửi chút ngọt ngào đến người bạn thương 💌</h1>
     <p>Hãy nói lời yêu thương của bạn, chúng mình sẽ gói lại thật xinh và gửi tới người đặc biệt dịp 20/10 💖</p>
 
-    <!-- CHỈ cho phép audio/video (server hiện chưa nhận image) -->
-    <input type="file" id="filePicker" accept="audio/*,video/*" hidden />
+    <!-- CHO PHÉP: ảnh + audio + video -->
+    <input type="file" id="filePicker" accept="image/*,audio/*,video/*" hidden />
     <div class="actions">
-      <button id="btnPick" class="play">📤 Tải file (audio/video)</button>
+      <button id="btnPick" class="play">🍰 Gửi lời yêu thương</button>
       <button id="btnRecord" class="btn-secondary">🎙️ Ghi âm trực tiếp</button>
     </div>
     <div class="small-note">
       iPhone: nếu không thấy file trong “Ảnh”, hãy chọn “Tệp” (Files) hoặc dùng nút <b>Ghi âm trực tiếp</b>.<br>
-      <i>Lưu ý:</i> kích thước tối đa <b>~25MB</b> (để an toàn dưới giới hạn máy chủ).
+      <b>Kích thước tối đa ~25MB</b>
     </div>
 
     <!-- Khu điều khiển ghi âm -->
@@ -111,9 +111,9 @@
   <script>
     const API_BASE = window.API_BASE || '';
 
-    // ====== CONST: rào trước lỗi ảnh & file quá lớn ======
-    const MAX_SIZE_MB = 25; // server đang ~30MB -> đặt 25MB để an toàn
-    const ACCEPTED_PREFIX = ['audio/', 'video/']; // server chưa nhận image/*
+    // ====== CONST ======
+    const MAX_SIZE_MB = 25; // an toàn dưới giới hạn server
+    const ACCEPTED_PREFIX = ['image/','audio/','video/'];
 
     // DOM
     const picker = document.getElementById('filePicker');
@@ -139,7 +139,7 @@
     // State ghi âm
     let mediaStream, mediaRecorder, recChunks = [], recInterval, recSeconds = 0;
 
-    // ===== Upload file (audio/video) =====
+    // ===== Upload file =====
     btnPick.addEventListener('click', () => picker.click());
     picker.addEventListener('change', async () => {
       if (!picker.files.length) return;
@@ -149,7 +149,7 @@
       const type = file.type || '';
       const isAccepted = ACCEPTED_PREFIX.some(p => type.startsWith(p));
       if (!isAccepted) {
-        alert('Hiện tại web chỉ nhận âm thanh hoặc video.\nNếu bạn muốn gửi ảnh, mình sẽ hỗ trợ khi server được cập nhật.');
+        alert('Hãy chọn ảnh, âm thanh hoặc video nhé.');
         picker.value = '';
         return;
       }
@@ -157,7 +157,7 @@
       // Kiểm tra kích thước
       const sizeMB = file.size / (1024*1024);
       if (sizeMB > MAX_SIZE_MB) {
-        alert(`File quá lớn (${sizeMB.toFixed(1)}MB). Giới hạn hiện tại là ${MAX_SIZE_MB}MB.\nHãy nén file hoặc chọn file nhỏ hơn nhé.`);
+        alert(`File quá lớn (${sizeMB.toFixed(1)}MB). Giới hạn hiện tại là ${MAX_SIZE_MB}MB.`);
         picker.value = '';
         return;
       }
@@ -264,7 +264,7 @@
 
       // Dùng XMLHttpRequest để theo dõi tiến trình
       const formData = new FormData();
-      formData.append('audio', file); // server đang đọc field 'audio'
+      formData.append('audio', file); // server đọc field 'audio'
 
       try {
         const url = `${API_BASE}/upload`;
