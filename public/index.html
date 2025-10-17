@@ -12,7 +12,7 @@
   <!-- QRCode -->
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
 
-  <!-- Bổ sung fix (font đồng bộ + tim bay + căn QR) -->
+  <!-- Bổ sung fix nhỏ (font đồng bộ + tim bay + căn QR + progress bar) -->
   <style>
     /* Đồng bộ font cho mọi control & text */
     html, body, button, input, textarea, select, a, p, h1, h2, h3, h4, h5 {
@@ -23,7 +23,6 @@
     button, input[type="button"], input[type="submit"] { -webkit-appearance: none; appearance: none; }
     .play, .btn-secondary { font-family: inherit !important; font-weight: 600; letter-spacing: .2px; }
 
-    /* Nút phụ & record nhỏ gọn */
     .actions { display:flex; justify-content:center; gap:8px; flex-wrap:wrap; }
     .small-note { font-size:.9rem; color:#888; margin-top:8px; }
     .rec-box { background:#fff5f9; border-radius:14px; margin-top:16px; padding:14px; box-shadow: inset 0 0 6px rgba(255,150,180,.15); }
@@ -32,7 +31,22 @@
     #qrCanvas { margin:12px auto 0; display:flex; justify-content:center; }
     .qr-actions { margin-top:8px; display:flex; justify-content:center; gap:8px; flex-wrap:wrap; }
 
-    /* Trái tim bay từ dưới màn hình (sửa lỗi thành hình tròn) */
+    /* Progress bar */
+    .progress {
+      margin: 10px auto 0;
+      width: 220px;
+      height: 8px;
+      background: #ffe0ec;
+      border-radius: 99px;
+      overflow: hidden;
+      display: none;
+    }
+    .progress > span {
+      display:block; height:100%; width:0%;
+      background:#ff93b8; transition: width .2s ease;
+    }
+
+    /* Trái tim bay từ dưới màn hình */
     .heart{
       position:fixed; bottom:-20px; width:18px; height:18px;
       background:#fba4c2; transform:rotate(45deg); animation:flyUp 6s linear infinite; z-index:0;
@@ -46,9 +60,6 @@
       0%{ transform:translateY(0) rotate(45deg); opacity:1; }
       100%{ transform:translateY(-100vh) rotate(45deg); opacity:0; }
     }
-
-    /* Vô hiệu hóa hiệu ứng blur cũ nếu có class này (tránh làm mờ cả panel) */
-    body.recording-active { filter:none !important; }
   </style>
 </head>
 
@@ -62,13 +73,16 @@
     <h1>Gửi chút ngọt ngào đến người bạn thương 💌</h1>
     <p>Hãy nói lời yêu thương của bạn, chúng mình sẽ gói lại thật xinh và gửi tới người đặc biệt dịp 20/10 💖</p>
 
-    <!-- Cho phép audio / video / ảnh -->
-    <input type="file" id="filePicker" accept="audio/*,video/*,image/*" hidden />
+    <!-- CHỈ cho phép audio/video (server hiện chưa nhận image) -->
+    <input type="file" id="filePicker" accept="audio/*,video/*" hidden />
     <div class="actions">
-      <button id="btnPick" class="play">📤 Tải file (audio/video/ảnh)</button>
+      <button id="btnPick" class="play">📤 Tải file (audio/video)</button>
       <button id="btnRecord" class="btn-secondary">🎙️ Ghi âm trực tiếp</button>
     </div>
-    <div class="small-note">iPhone: nếu không thấy file trong “Ảnh”, hãy chọn “Tệp” (Files) hoặc dùng nút <b>Ghi âm trực tiếp</b>.</div>
+    <div class="small-note">
+      iPhone: nếu không thấy file trong “Ảnh”, hãy chọn “Tệp” (Files) hoặc dùng nút <b>Ghi âm trực tiếp</b>.<br>
+      <i>Lưu ý:</i> kích thước tối đa <b>~25MB</b> (để an toàn dưới giới hạn máy chủ).
+    </div>
 
     <!-- Khu điều khiển ghi âm -->
     <div id="recPanel" class="rec-box" style="display:none;">
@@ -86,6 +100,7 @@
       <p>✨ Link người nhận của bạn:</p>
       <a id="receiverLink" target="_blank" rel="noopener"></a>
       <div id="qrCanvas"></div>
+      <div class="progress" id="progress"><span id="bar"></span></div>
       <div class="qr-actions">
         <button id="btnDownloadQR" class="btn-secondary">⬇️ Tải QR</button>
         <button id="btnCopyLink" class="btn-secondary">🔗 Copy link</button>
@@ -95,6 +110,10 @@
 
   <script>
     const API_BASE = window.API_BASE || '';
+
+    // ====== CONST: rào trước lỗi ảnh & file quá lớn ======
+    const MAX_SIZE_MB = 25; // server đang ~30MB -> đặt 25MB để an toàn
+    const ACCEPTED_PREFIX = ['audio/', 'video/']; // server chưa nhận image/*
 
     // DOM
     const picker = document.getElementById('filePicker');
@@ -114,14 +133,36 @@
     const btnDownloadQR = document.getElementById('btnDownloadQR');
     const btnCopyLink = document.getElementById('btnCopyLink');
 
+    const progress = document.getElementById('progress');
+    const bar = document.getElementById('bar');
+
     // State ghi âm
     let mediaStream, mediaRecorder, recChunks = [], recInterval, recSeconds = 0;
 
-    // ===== Upload file (audio/video/ảnh) =====
+    // ===== Upload file (audio/video) =====
     btnPick.addEventListener('click', () => picker.click());
     picker.addEventListener('change', async () => {
       if (!picker.files.length) return;
-      await uploadFile(picker.files[0]);
+      const file = picker.files[0];
+
+      // Kiểm tra loại file
+      const type = file.type || '';
+      const isAccepted = ACCEPTED_PREFIX.some(p => type.startsWith(p));
+      if (!isAccepted) {
+        alert('Hiện tại web chỉ nhận âm thanh hoặc video.\nNếu bạn muốn gửi ảnh, mình sẽ hỗ trợ khi server được cập nhật.');
+        picker.value = '';
+        return;
+      }
+
+      // Kiểm tra kích thước
+      const sizeMB = file.size / (1024*1024);
+      if (sizeMB > MAX_SIZE_MB) {
+        alert(`File quá lớn (${sizeMB.toFixed(1)}MB). Giới hạn hiện tại là ${MAX_SIZE_MB}MB.\nHãy nén file hoặc chọn file nhỏ hơn nhé.`);
+        picker.value = '';
+        return;
+      }
+
+      await uploadFile(file);
       picker.value = ''; // reset để chọn lại được
     });
 
@@ -140,10 +181,7 @@
     btnStartRec.addEventListener('click', async () => {
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // (Không blur trang để tránh mờ panel)
-        // document.body.classList.add('recording-active');
 
-        // Chọn mime khả dụng
         const mimeCandidates = ['audio/webm', 'audio/mp4', 'audio/ogg'];
         let mimeType = '';
         for (const m of mimeCandidates) {
@@ -163,8 +201,13 @@
                     : 'webm';
           const file = new File([blob], `voice-${Date.now()}.${ext}`, { type: blob.type });
 
-          await uploadFile(file);
-          // document.body.classList.remove('recording-active');
+          // Kiểm tra size trước khi gửi
+          const sizeMB = file.size / (1024*1024);
+          if (sizeMB > MAX_SIZE_MB) {
+            alert(`Bản ghi quá lớn (${sizeMB.toFixed(1)}MB). Giới hạn hiện tại là ${MAX_SIZE_MB}MB.`);
+          } else {
+            await uploadFile(file);
+          }
           cleanupRecording();
         };
 
@@ -185,7 +228,6 @@
 
       } catch (e) {
         console.error(e);
-        // document.body.classList.remove('recording-active');
         recStatus.textContent = 'Không truy cập được micro. Hãy cấp quyền hoặc dùng cách tải file.';
       }
     });
@@ -199,7 +241,6 @@
       clearInterval(recInterval);
       btnStopRec.disabled = true;
       recStatus.textContent = 'Đang xử lý…';
-      // document.body.classList.remove('recording-active');
     });
 
     function cleanupRecording() {
@@ -210,23 +251,30 @@
       btnStopRec.disabled  = true;
     }
 
-    // ===== Upload dùng chung =====
+    // ===== Upload dùng chung (có progress) =====
     async function uploadFile(file) {
       btnPick.disabled = true;
       btnRecord.disabled = true;
       const oldText = btnPick.textContent;
       btnPick.textContent = 'Đang gửi yêu thương…';
 
+      // Hiện progress
+      progress.style.display = 'block';
+      bar.style.width = '0%';
+
+      // Dùng XMLHttpRequest để theo dõi tiến trình
       const formData = new FormData();
-      // Trường tên 'audio' để server nhận (dù file là audio/video/ảnh)
-      formData.append('audio', file);
+      formData.append('audio', file); // server đang đọc field 'audio'
 
       try {
-        const res  = await fetch(`${API_BASE}/upload`, { method: 'POST', body: formData });
-        const data = await res.json();
+        const url = `${API_BASE}/upload`;
+        const response = await xhrUpload(url, formData, (percent) => {
+          bar.style.width = percent + '%';
+        });
+
+        const data = JSON.parse(response);
         if (!data.success) throw new Error(data.message || 'Upload thất bại');
 
-        // Link ngắn từ server: /r/<id> hoặc absoluteReceiverUrl
         const fullURL = data.absoluteReceiverUrl || `${location.origin}${data.receiverUrl}`;
         receiverLink.textContent = fullURL;
         receiverLink.href = fullURL;
@@ -235,7 +283,6 @@
         qrCanvas.innerHTML = '';
         new QRCode(qrCanvas, { text: fullURL, width: 200, height: 200, colorDark: '#e2528e', colorLight: '#fff7fa' });
         resultBox.style.display = 'block';
-        // Cuộn xuống phần kết quả
         resultBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
       } catch (err) {
@@ -245,7 +292,24 @@
         btnPick.disabled = false;
         btnRecord.disabled = false;
         btnPick.textContent = oldText;
+        setTimeout(() => { progress.style.display = 'none'; bar.style.width = '0%'; }, 600);
       }
+    }
+
+    // Helper: upload bằng XHR để có progress
+    function xhrUpload(url, formData, onProgress) {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url, true);
+        xhr.upload.onprogress = (e) => {
+          if (!e.lengthComputable) return;
+          const percent = Math.min(100, Math.round((e.loaded / e.total) * 100));
+          onProgress?.(percent);
+        };
+        xhr.onload = () => (xhr.status >= 200 && xhr.status < 300) ? resolve(xhr.responseText) : reject(new Error(xhr.statusText || 'Upload error'));
+        xhr.onerror = () => reject(new Error('Network error'));
+        xhr.send(formData);
+      });
     }
 
     // Tải QR về máy
@@ -270,7 +334,7 @@
       }
     });
 
-    // 💗 Tim bay ngẫu nhiên (từ dưới lên, đúng hình tim)
+    // 💗 Tim bay ngẫu nhiên
     setInterval(() => {
       const heart = document.createElement('div');
       heart.classList.add('heart');
