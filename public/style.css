@@ -173,3 +173,6 @@ a#receiverLink:hover { text-decoration:underline; }
 
 /* Cuộn mượt */
 html { scroll-behavior: smooth; }
+
+/* ✅ Đồng bộ kích thước chữ cho nút ghi âm trực tiếp (= nút upload) */
+#btnRecord { font-size: 1.05rem; }
