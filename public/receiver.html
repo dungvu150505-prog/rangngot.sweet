@@ -34,34 +34,50 @@
     const params  = new URLSearchParams(location.search);
     const fileURL = params.get('file') || params.get('audio') || params.get('src') || params.get('url');
 
-    // ---- Phân loại: ƯU TIÊN Content-Type từ server, fallback theo đuôi ----
+    // --- Helpers ---
+    function fileExt(url) {
+      const clean = (url || '').split('?')[0].split('#')[0];
+      return (clean.split('.').pop() || '').toLowerCase();
+    }
+
+    // Fallback theo đuôi khi không đọc được Content-Type
     function detectTypeByExt(url) {
-      const clean = url.split('?')[0].split('#')[0];
-      const ext = (clean.split('.').pop() || '').toLowerCase();
+      const ext = fileExt(url);
       const IMG = ['png','jpg','jpeg','gif','webp','bmp','svg','heic','heif','avif'];
-      const VID = ['mp4','mov','m4v','3gp','3gpp']; // cố ý KHÔNG cho 'webm','ogg' vào video
-      const AUD = ['mp3','wav','aac','m4a','ogg','oga','flac','webm']; // ghi âm trực tiếp thường là audio/webm|ogg
+      // Video mạnh: giữ cho video thực sự
+      const VID = ['mp4','mov','m4v','3gp','3gpp'];
+      // Audio bao gồm webm/ogg để cover ghi âm trực tiếp
+      const AUD = ['mp3','wav','aac','m4a','ogg','oga','flac','webm'];
       if (IMG.includes(ext)) return 'image';
       if (VID.includes(ext)) return 'video';
       if (AUD.includes(ext)) return 'audio';
       return 'audio';
     }
 
+    // Ưu tiên Content-Type nhưng ÉP video nếu đuôi thuộc nhóm video mạnh
     async function detectTypeByMime(url) {
+      const ext = fileExt(url);
+      const STRONG_VIDEO_EXT = new Set(['mp4','mov','m4v','3gp','3gpp']);
+
+      // Nếu là đuôi video mạnh -> ép video ngay từ đầu
+      if (STRONG_VIDEO_EXT.has(ext)) return 'video';
+
       try {
-        // Ưu tiên HEAD để nhẹ; nếu bị chặn thì GET 1 byte để lấy header
         let res = await fetch(url, { method: 'HEAD', mode: 'cors' });
         if (!res.ok || !res.headers) throw 0;
-        let ct = res.headers.get('content-type') || '';
-        if (!ct) throw 0;
+        const ct = (res.headers.get('content-type') || '').toLowerCase();
+
+        if (STRONG_VIDEO_EXT.has(ext)) return 'video'; // vẫn ưu tiên đuôi mạnh
         if (ct.startsWith('image/')) return 'image';
         if (ct.startsWith('video/')) return 'video';
         if (ct.startsWith('audio/')) return 'audio';
-        return 'audio';
+        return detectTypeByExt(url);
       } catch {
         try {
           const res2 = await fetch(url, { method: 'GET', headers: { Range: 'bytes=0-0' }, mode: 'cors' });
-          const ct2 = res2.headers?.get('content-type') || '';
+          const ct2 = (res2.headers?.get('content-type') || '').toLowerCase();
+
+          if (STRONG_VIDEO_EXT.has(ext)) return 'video';
           if (ct2.startsWith('image/')) return 'image';
           if (ct2.startsWith('video/')) return 'video';
           if (ct2.startsWith('audio/')) return 'audio';
