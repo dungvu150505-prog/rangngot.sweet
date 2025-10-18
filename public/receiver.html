@@ -34,45 +34,64 @@
     const params  = new URLSearchParams(location.search);
     const fileURL = params.get('file') || params.get('audio') || params.get('src') || params.get('url');
 
-    // Phân loại theo đuôi file (đúng yêu cầu)
-    // Ảnh -> image; Ghi âm/ghi âm trực tiếp -> audio; Video -> video
-    function detectType(url) {
-      if (!url) return 'unknown';
+    // ---- Phân loại: ƯU TIÊN Content-Type từ server, fallback theo đuôi ----
+    function detectTypeByExt(url) {
       const clean = url.split('?')[0].split('#')[0];
       const ext = (clean.split('.').pop() || '').toLowerCase();
-
-      // ẢNH
       const IMG = ['png','jpg','jpeg','gif','webp','bmp','svg','heic','heif','avif'];
-
-      // VIDEO: chỉ giữ các đuôi video thực sự (KHÔNG gồm webm/ogg vì ghi âm thường ra 2 đuôi này)
-      const VID = ['mp4','mov','m4v','3gp','3gpp'];
-
-      // AUDIO: bao gồm webm/ogg để ghi âm trực tiếp đi vào audio
-      const AUD = ['mp3','wav','aac','m4a','ogg','oga','flac','webm'];
-
+      const VID = ['mp4','mov','m4v','3gp','3gpp']; // cố ý KHÔNG cho 'webm','ogg' vào video
+      const AUD = ['mp3','wav','aac','m4a','ogg','oga','flac','webm']; // ghi âm trực tiếp thường là audio/webm|ogg
       if (IMG.includes(ext)) return 'image';
       if (VID.includes(ext)) return 'video';
       if (AUD.includes(ext)) return 'audio';
-      return 'audio'; // fallback an toàn
+      return 'audio';
     }
 
-    if (!fileURL) {
-      mediaWrap.innerHTML = `
-        <p style="color:#555; font-size:1.05rem; line-height:1.55; margin:0 0 16px;">
-          Mình không tìm thấy nội dung trong liên kết này. Hãy kiểm tra lại đường link hoặc nhờ người gửi tạo lại nhé.
-        </p>
-        <div style="margin-top:8px;">
-          <a href="/" class="btn-secondary" style="text-decoration:none; padding:10px 16px; border-radius:12px; background:#ffd1e1; color:#a83f6b; box-shadow:0 4px 10px rgba(255,170,200,.2);">🍰 Quay về trang gửi</a>
-        </div>
-      `;
-      actionBtn.style.display = 'none';
-      note.textContent = '—';
-    } else {
-      const kind = detectType(fileURL);
+    async function detectTypeByMime(url) {
+      try {
+        // Ưu tiên HEAD để nhẹ; nếu bị chặn thì GET 1 byte để lấy header
+        let res = await fetch(url, { method: 'HEAD', mode: 'cors' });
+        if (!res.ok || !res.headers) throw 0;
+        let ct = res.headers.get('content-type') || '';
+        if (!ct) throw 0;
+        if (ct.startsWith('image/')) return 'image';
+        if (ct.startsWith('video/')) return 'video';
+        if (ct.startsWith('audio/')) return 'audio';
+        return 'audio';
+      } catch {
+        try {
+          const res2 = await fetch(url, { method: 'GET', headers: { Range: 'bytes=0-0' }, mode: 'cors' });
+          const ct2 = res2.headers?.get('content-type') || '';
+          if (ct2.startsWith('image/')) return 'image';
+          if (ct2.startsWith('video/')) return 'video';
+          if (ct2.startsWith('audio/')) return 'audio';
+          return detectTypeByExt(url);
+        } catch {
+          return detectTypeByExt(url);
+        }
+      }
+    }
+
+    async function init() {
+      if (!fileURL) {
+        mediaWrap.innerHTML = `
+          <p style="color:#555; font-size:1.05rem; line-height:1.55; margin:0 0 16px;">
+            Mình không tìm thấy nội dung trong liên kết này. Hãy kiểm tra lại đường link hoặc nhờ người gửi tạo lại nhé.
+          </p>
+          <div style="margin-top:8px;">
+            <a href="/" class="btn-secondary" style="text-decoration:none; padding:10px 16px; border-radius:12px; background:#ffd1e1; color:#a83f6b; box-shadow:0 4px 10px rgba(255,170,200,.2);">🍰 Quay về trang gửi</a>
+          </div>
+        `;
+        actionBtn.style.display = 'none';
+        note.textContent = '—';
+        return;
+      }
+
+      const kind = await detectTypeByMime(fileURL);
       let mediaEl = null;
 
-      // ===== ẢNH =====
       if (kind === 'image') {
+        // ===== ẢNH =====
         mediaEl = new Image();
         mediaEl.src = fileURL;
         mediaEl.alt = 'Ảnh lời chúc';
@@ -89,9 +108,8 @@
           document.body.appendChild(a); a.click(); a.remove();
         };
 
-      // ===== VIDEO =====
       } else if (kind === 'video') {
-        // Tạo video
+        // ===== VIDEO =====
         mediaEl = document.createElement('video');
         mediaEl.src = fileURL;
         mediaEl.controls = true;
@@ -126,14 +144,11 @@
           };
         };
 
-        // ✅ Kiểm tra metadata để biết có track hình (tránh rơi nhầm về audio)
+        // Bảo hiểm: chỉ fallback sang audio khi KHÔNG có khung hình VÀ KHÔNG có video track
         mediaEl.addEventListener('loadedmetadata', () => {
           const noVideoFrame = (mediaEl.videoWidth === 0 && mediaEl.videoHeight === 0);
-          // Chỉ coi là "không có video track" khi API tồn tại
           const hasVideoTrackAPI = !!(mediaEl.videoTracks && typeof mediaEl.videoTracks.length === 'number');
           const noVideoTracks   = hasVideoTrackAPI ? (mediaEl.videoTracks.length === 0) : false;
-
-          // CHỈ fallback sang audio khi CẢ 2 điều kiện đều đúng
           if (noVideoFrame && noVideoTracks) {
             switchToAudioUI();
           }
@@ -152,8 +167,8 @@
           }
         };
 
-      // ===== AUDIO (ghi âm trực tiếp & audio thường) =====
       } else {
+        // ===== AUDIO (ghi âm trực tiếp & audio thường) =====
         mediaEl = document.createElement('audio');
         mediaEl.preload = 'auto';
         mediaEl.src = fileURL;
@@ -176,6 +191,9 @@
         };
       }
     }
+
+    // Khởi chạy
+    init();
 
     // 💗 Tim bay ngẫu nhiên
     setInterval(() => {
