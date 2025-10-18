@@ -34,30 +34,28 @@
     const params  = new URLSearchParams(location.search);
     const fileURL = params.get('file') || params.get('audio') || params.get('src') || params.get('url');
 
-    // --- Helpers ---
+    // ---------- Helpers ----------
     function fileExt(url) {
       const clean = (url || '').split('?')[0].split('#')[0];
       return (clean.split('.').pop() || '').toLowerCase();
     }
 
+    const STRONG_VIDEO_EXT = new Set(['mp4','mov','m4v','3gp','3gpp']);
+    const IMG_EXT = new Set(['png','jpg','jpeg','gif','webp','bmp','svg','heic','heif','avif']);
+    const AUD_EXT = new Set(['mp3','wav','aac','m4a','ogg','oga','flac','webm']);
+
     // Fallback theo đuôi khi không đọc được Content-Type
     function detectTypeByExt(url) {
       const ext = fileExt(url);
-      const IMG = ['png','jpg','jpeg','gif','webp','bmp','svg','heic','heif','avif'];
-      // Video mạnh: giữ cho video thực sự
-      const VID = ['mp4','mov','m4v','3gp','3gpp'];
-      // Audio bao gồm webm/ogg để cover ghi âm trực tiếp
-      const AUD = ['mp3','wav','aac','m4a','ogg','oga','flac','webm'];
-      if (IMG.includes(ext)) return 'image';
-      if (VID.includes(ext)) return 'video';
-      if (AUD.includes(ext)) return 'audio';
+      if (IMG_EXT.has(ext)) return 'image';
+      if (STRONG_VIDEO_EXT.has(ext)) return 'video';
+      if (AUD_EXT.has(ext)) return 'audio';
       return 'audio';
     }
 
     // Ưu tiên Content-Type nhưng ÉP video nếu đuôi thuộc nhóm video mạnh
     async function detectTypeByMime(url) {
       const ext = fileExt(url);
-      const STRONG_VIDEO_EXT = new Set(['mp4','mov','m4v','3gp','3gpp']);
 
       // Nếu là đuôi video mạnh -> ép video ngay từ đầu
       if (STRONG_VIDEO_EXT.has(ext)) return 'video';
@@ -67,7 +65,7 @@
         if (!res.ok || !res.headers) throw 0;
         const ct = (res.headers.get('content-type') || '').toLowerCase();
 
-        if (STRONG_VIDEO_EXT.has(ext)) return 'video'; // vẫn ưu tiên đuôi mạnh
+        if (STRONG_VIDEO_EXT.has(ext)) return 'video';
         if (ct.startsWith('image/')) return 'image';
         if (ct.startsWith('video/')) return 'video';
         if (ct.startsWith('audio/')) return 'audio';
@@ -88,6 +86,33 @@
       }
     }
 
+    // Bước thăm dò (probe) cực kỳ chắc: thử nạp video ẩn để xem có khung hình không
+    function probeIsVideo(url, timeoutMs = 1500) {
+      return new Promise((resolve) => {
+        const v = document.createElement('video');
+        let done = false;
+        const finish = (isVideo) => { if (!done) { done = true; resolve(!!isVideo); cleanup(); } };
+        const cleanup = () => {
+          v.removeEventListener('loadeddata', onData);
+          v.removeEventListener('loadedmetadata', onMeta);
+          v.removeEventListener('error', onErr);
+          v.src = ''; // GC
+        };
+        const onData = () => finish(v.videoWidth > 0 && v.videoHeight > 0);
+        const onMeta = () => finish(v.videoWidth > 0 && v.videoHeight > 0);
+        const onErr  = () => finish(false);
+
+        v.preload = 'metadata';
+        v.playsInline = true;
+        v.muted = true;
+        v.src = url;
+        v.addEventListener('loadeddata', onData);
+        v.addEventListener('loadedmetadata', onMeta);
+        v.addEventListener('error', onErr);
+        setTimeout(() => finish(v.videoWidth > 0 && v.videoHeight > 0), timeoutMs);
+      });
+    }
+
     async function init() {
       if (!fileURL) {
         mediaWrap.innerHTML = `
@@ -103,11 +128,19 @@
         return;
       }
 
-      const kind = await detectTypeByMime(fileURL);
+      const ext = fileExt(fileURL);
+      let kind = await detectTypeByMime(fileURL);
+
+      // Nếu đang nghĩ là audio nhưng đuôi thuộc nhóm video mạnh -> probe một phát cho chắc
+      if (kind === 'audio' && STRONG_VIDEO_EXT.has(ext)) {
+        const reallyVideo = await probeIsVideo(fileURL, 1500);
+        if (reallyVideo) kind = 'video';
+      }
+
       let mediaEl = null;
 
+      // ===== ẢNH =====
       if (kind === 'image') {
-        // ===== ẢNH =====
         mediaEl = new Image();
         mediaEl.src = fileURL;
         mediaEl.alt = 'Ảnh lời chúc';
@@ -124,8 +157,8 @@
           document.body.appendChild(a); a.click(); a.remove();
         };
 
+      // ===== VIDEO =====
       } else if (kind === 'video') {
-        // ===== VIDEO =====
         mediaEl = document.createElement('video');
         mediaEl.src = fileURL;
         mediaEl.controls = true;
@@ -183,8 +216,8 @@
           }
         };
 
+      // ===== AUDIO (ghi âm trực tiếp & audio thường) =====
       } else {
-        // ===== AUDIO (ghi âm trực tiếp & audio thường) =====
         mediaEl = document.createElement('audio');
         mediaEl.preload = 'auto';
         mediaEl.src = fileURL;
