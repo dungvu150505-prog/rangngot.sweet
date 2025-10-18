@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Một chút ngọt ngào gửi tới bạn</title>
 
-  <!-- Font + style chung -->
   <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
 </head>
@@ -20,10 +19,8 @@
     <h1>Một chút ngọt ngào gửi tới bạn</h1>
     <p id="desc">Đây là đôi lời ngọt ngào từ một người đặc biệt muốn dành tặng cho bạn nhân dịp 20/10. Nhấn nút bên dưới để xem/nghe nhé 🎀</p>
 
-    <!-- Vùng hiển thị media động -->
     <div id="mediaWrap" style="margin-top:8px;"></div>
 
-    <!-- Nút hành động (tuỳ loại file mà đổi chức năng) -->
     <button class="play" id="actionBtn">🎧 Nghe lời chúc</button>
     <div class="note" id="note">Nếu không tự phát, hãy bấm nút ở trên nhé</div>
   </div>
@@ -31,12 +28,11 @@
   <script>
     const actionBtn = document.getElementById('actionBtn');
     const note      = document.getElementById('note');
-    const desc      = document.getElementById('desc');
     const mediaWrap = document.getElementById('mediaWrap');
 
-    // Chấp nhận nhiều tên tham số để tương thích: ?audio=, ?file=, ?src=, ?url=
-    const params = new URLSearchParams(location.search);
-    const fileURL = params.get('audio') || params.get('file') || params.get('src') || params.get('url');
+    // Nhận tham số (tương thích nhiều tên)
+    const params  = new URLSearchParams(location.search);
+    const fileURL = params.get('file') || params.get('audio') || params.get('src') || params.get('url');
 
     // Phân loại theo đuôi file
     function detectType(url) {
@@ -49,21 +45,25 @@
       if (IMG.includes(ext)) return 'image';
       if (VID.includes(ext)) return 'video';
       if (AUD.includes(ext)) return 'audio';
-      // Không rõ đuôi -> ưu tiên audio (tương thích cũ)
-      return 'audio';
+      return 'audio'; // fallback tương thích cũ
     }
 
-    // Tạo phần tử media tương ứng
-    let mediaEl = null;
-    const kind = detectType(fileURL);
-
     if (!fileURL) {
-      actionBtn.disabled = true;
-      actionBtn.textContent = '❌ Không tìm thấy nội dung';
-      note.textContent = 'Hãy kiểm tra lại link nhận hoặc nhờ người gửi gửi lại nhé.';
+      mediaWrap.innerHTML = `
+        <p style="color:#555; font-size:1.05rem; line-height:1.55; margin:0 0 16px;">
+          Mình không tìm thấy nội dung trong liên kết này. Hãy kiểm tra lại đường link hoặc nhờ người gửi tạo lại nhé.
+        </p>
+        <div style="margin-top:8px;">
+          <a href="/" class="btn-secondary" style="text-decoration:none; padding:10px 16px; border-radius:12px; background:#ffd1e1; color:#a83f6b; box-shadow:0 4px 10px rgba(255,170,200,.2);">🍰 Quay về trang gửi</a>
+        </div>
+      `;
+      actionBtn.style.display = 'none';
+      note.textContent = '—';
     } else {
+      const kind = detectType(fileURL);
+      let mediaEl = null;
+
       if (kind === 'image') {
-        // Ảnh
         mediaEl = new Image();
         mediaEl.src = fileURL;
         mediaEl.alt = 'Ảnh lời chúc';
@@ -76,12 +76,10 @@
         note.textContent = 'Chúc bạn một ngày thật ngọt ngào 🍰';
         actionBtn.onclick = () => {
           const a = document.createElement('a');
-          a.href = fileURL;
-          a.download = 'rangngot-image';
+          a.href = fileURL; a.download = 'rangngot-image';
           document.body.appendChild(a); a.click(); a.remove();
         };
       } else if (kind === 'video') {
-        // Video
         mediaEl = document.createElement('video');
         mediaEl.src = fileURL;
         mediaEl.controls = true;
@@ -103,12 +101,12 @@
           }
         };
       } else {
-        // Audio (mặc định/ tương thích cũ)
         mediaEl = document.createElement('audio');
         mediaEl.preload = 'auto';
         mediaEl.src = fileURL;
-        mediaEl.style.display = 'none'; // nút chính sẽ điều khiển phát
-        mediaEl.setAttribute('controls', ''); // vẫn thêm để người dùng có thể mở nếu muốn
+        mediaEl.controls = true;         // hiển thị control tiêu chuẩn
+        mediaEl.style.width = '100%';
+        mediaEl.style.marginTop = '8px';
         mediaWrap.appendChild(mediaEl);
 
         actionBtn.textContent = '🎧 Nghe lời chúc';
@@ -119,15 +117,14 @@
               .then(() => actionBtn.textContent = '⏸ Dừng lại')
               .catch(() => alert('Trình duyệt chặn tự phát, bấm lại để phát nhé.'));
           } else {
-            mediaEl.pause();
-            mediaEl.currentTime = 0;
+            mediaEl.pause(); mediaEl.currentTime = 0;
             actionBtn.textContent = '🎧 Nghe lời chúc';
           }
         };
       }
     }
 
-    // 💗 Tim bay ngẫu nhiên (đáy màn hình)
+    // 💗 Tim bay ngẫu nhiên
     setInterval(() => {
       const heart = document.createElement('div');
       heart.classList.add('heart');

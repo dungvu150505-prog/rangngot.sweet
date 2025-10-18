@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Liên kết không còn hiệu lực - Răng Ngọt</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .msg { color:#555; font-size:1.05rem; line-height:1.55; margin:0 0 16px; }
+    .actions { display:flex; justify-content:center; gap:8px; flex-wrap:wrap; }
+    .btn-secondary { background:#ffd1e1; color:#a83f6b; border:none; border-radius:12px; padding:10px 16px; cursor:pointer; box-shadow:0 4px 10px rgba(255,170,200,.2); }
+    .btn-secondary:hover { filter:brightness(.98); transform:translateY(-1px); }
+  </style>
+</head>
+<body>
+  <!-- 🍰 Logo + slogan -->
+  <img src="https://file.garden/aO0lFjCQS03opF7T/st.PNG" alt="Logo RangNgot" class="logo">
+  <div class="slogan">From RangNgot with Love 💞</div>
+
+  <div class="card">
+    <h1>Liên kết không còn hiệu lực ⏳</h1>
+    <p id="message" class="msg">Đường link này đã hết hạn. Hãy nhờ người gửi tạo lại giúp bạn nhé.</p>
+    <div class="actions">
+      <a href="/" class="btn-secondary" style="text-decoration:none;">🍰 Quay về trang gửi</a>
+    </div>
+  </div>
+
+  <script>
+    const p = new URLSearchParams(location.search);
+    const reason = p.get('reason'); // 'expired' | 'notfound'
+    const ttl = parseInt(p.get('ttl') || '72', 10);
+
+    const msg = document.getElementById('message');
+    if (reason === 'expired') {
+      msg.textContent = `Đường link & file đính kèm đã hết hạn sau ${ttl} giờ. Bạn có thể nhờ người gửi tạo lại đường link mới.`;
+    } else if (reason === 'notfound') {
+      msg.textContent = `Mình không tìm thấy liên kết này. Có thể link chưa đúng, hoặc đã bị xoá sau ${ttl} giờ.`;
+    }
+  </script>
+
+  <script>
+    setInterval(() => {
+      const heart = document.createElement('div');
+      heart.classList.add('heart');
+      heart.style.left = Math.random() * 100 + 'vw';
+      heart.style.animationDuration = (3 + Math.random() * 3) + 's';
+      heart.style.backgroundColor = `hsl(${340 + Math.random() * 20}, 90%, 75%)`;
+      document.body.appendChild(heart);
+      setTimeout(() => heart.remove(), 6000);
+    }, 800);
+  </script>
+</body>
+</html>
