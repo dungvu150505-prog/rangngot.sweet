@@ -115,11 +115,15 @@
           };
         };
 
-        // Kiểm tra metadata để biết có track hình hay không
+        // ✅ Kiểm tra metadata để biết có track hình hay không (đã sửa)
         mediaEl.addEventListener('loadedmetadata', () => {
           const noVideoFrame = (mediaEl.videoWidth === 0 && mediaEl.videoHeight === 0);
-          const noVideoTracks = (mediaEl.videoTracks && typeof mediaEl.videoTracks.length === 'number' && mediaEl.videoTracks.length === 0);
-          if (noVideoFrame || noVideoTracks) {
+          // Chỉ coi là "không có video track" khi API tồn tại
+          const hasVideoTrackAPI = !!(mediaEl.videoTracks && typeof mediaEl.videoTracks.length === 'number');
+          const noVideoTracks   = hasVideoTrackAPI ? (mediaEl.videoTracks.length === 0) : false;
+
+          // CHỈ fallback sang audio khi CẢ 2 điều kiện đều đúng
+          if (noVideoFrame && noVideoTracks) {
             switchToAudioUI();
           }
         });
