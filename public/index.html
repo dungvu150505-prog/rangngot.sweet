@@ -76,8 +76,10 @@
     <!-- CHO PHÉP: ảnh + audio + video -->
     <input type="file" id="filePicker" accept="image/*,audio/*,video/*" hidden />
     <div class="actions">
-      <button id="btnPick" class="play">🍰 Gửi lời yêu thương</button>
-      <button id="btnRecord" class="btn-secondary">🎙️ Ghi âm trực tiếp</button>
+      <!-- (1) Đổi nhãn nút upload -->
+      <button id="btnPick" class="play">Upload (ảnh/audio/video)</button>
+      <!-- (2) Đổi nhãn nút ghi âm -->
+      <button id="btnRecord" class="btn-secondary">🍰 Gửi lời yêu thương</button>
     </div>
     <div class="small-note">
       iPhone: nếu không thấy file trong “Ảnh”, hãy chọn “Tệp” (Files) hoặc dùng nút <b>Ghi âm trực tiếp</b>.<br>
@@ -135,6 +137,12 @@
 
     const progress = document.getElementById('progress');
     const bar = document.getElementById('bar');
+
+    // (3) Đồng bộ cỡ chữ nút ghi âm = nút upload (chỉ áp dụng #btnRecord)
+    requestAnimationFrame(() => {
+      const fs = getComputedStyle(btnPick).fontSize;
+      if (fs) btnRecord.style.fontSize = fs;
+    });
 
     // State ghi âm
     let mediaStream, mediaRecorder, recChunks = [], recInterval, recSeconds = 0;
