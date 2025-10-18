@@ -34,18 +34,26 @@
     const params  = new URLSearchParams(location.search);
     const fileURL = params.get('file') || params.get('audio') || params.get('src') || params.get('url');
 
-    // Phân loại theo đuôi file
+    // Phân loại theo đuôi file (đúng yêu cầu)
+    // Ảnh -> image; Ghi âm/ghi âm trực tiếp -> audio; Video -> video
     function detectType(url) {
       if (!url) return 'unknown';
       const clean = url.split('?')[0].split('#')[0];
       const ext = (clean.split('.').pop() || '').toLowerCase();
+
+      // ẢNH
       const IMG = ['png','jpg','jpeg','gif','webp','bmp','svg','heic','heif','avif'];
-      const VID = ['mp4','webm','ogg','mov','m4v','3gp','3gpp'];
+
+      // VIDEO: chỉ giữ các đuôi video thực sự (KHÔNG gồm webm/ogg vì ghi âm thường ra 2 đuôi này)
+      const VID = ['mp4','mov','m4v','3gp','3gpp'];
+
+      // AUDIO: bao gồm webm/ogg để ghi âm trực tiếp đi vào audio
       const AUD = ['mp3','wav','aac','m4a','ogg','oga','flac','webm'];
+
       if (IMG.includes(ext)) return 'image';
       if (VID.includes(ext)) return 'video';
       if (AUD.includes(ext)) return 'audio';
-      return 'audio'; // fallback tương thích cũ
+      return 'audio'; // fallback an toàn
     }
 
     if (!fileURL) {
@@ -63,6 +71,7 @@
       const kind = detectType(fileURL);
       let mediaEl = null;
 
+      // ===== ẢNH =====
       if (kind === 'image') {
         mediaEl = new Image();
         mediaEl.src = fileURL;
@@ -79,8 +88,10 @@
           a.href = fileURL; a.download = 'rangngot-image';
           document.body.appendChild(a); a.click(); a.remove();
         };
+
+      // ===== VIDEO =====
       } else if (kind === 'video') {
-        // Tạo video trước để kiểm tra có khung hình không
+        // Tạo video
         mediaEl = document.createElement('video');
         mediaEl.src = fileURL;
         mediaEl.controls = true;
@@ -91,7 +102,7 @@
         mediaEl.style.boxShadow = '0 6px 18px rgba(255,150,180,.18)';
         mediaWrap.appendChild(mediaEl);
 
-        // Nếu file thực tế chỉ có audio (ghi âm), chuyển sang audio UI
+        // Nếu thực tế chỉ có audio trong container, chuyển sang audio UI
         const switchToAudioUI = () => {
           const audioEl = document.createElement('audio');
           audioEl.src = fileURL;
@@ -115,7 +126,7 @@
           };
         };
 
-        // ✅ Kiểm tra metadata để biết có track hình hay không (đã sửa)
+        // ✅ Kiểm tra metadata để biết có track hình (tránh rơi nhầm về audio)
         mediaEl.addEventListener('loadedmetadata', () => {
           const noVideoFrame = (mediaEl.videoWidth === 0 && mediaEl.videoHeight === 0);
           // Chỉ coi là "không có video track" khi API tồn tại
@@ -128,11 +139,9 @@
           }
         });
 
-        // Điều khiển mặc định cho trường hợp thật sự là video
         actionBtn.textContent = '▶️ Phát video';
         note.textContent = 'Nếu không phát, bấm nút để xem nhé.';
         actionBtn.onclick = () => {
-          // Nếu đã đổi sang audio UI, handler trên sẽ thay thế
           if (mediaEl && mediaEl.tagName === 'VIDEO') {
             if (mediaEl.paused) {
               mediaEl.play().then(() => actionBtn.textContent = '⏸ Tạm dừng').catch(()=>{});
@@ -142,11 +151,13 @@
             }
           }
         };
+
+      // ===== AUDIO (ghi âm trực tiếp & audio thường) =====
       } else {
         mediaEl = document.createElement('audio');
         mediaEl.preload = 'auto';
         mediaEl.src = fileURL;
-        mediaEl.controls = true;         // hiển thị control tiêu chuẩn
+        mediaEl.controls = true;
         mediaEl.style.width = '100%';
         mediaEl.style.marginTop = '8px';
         mediaWrap.appendChild(mediaEl);
