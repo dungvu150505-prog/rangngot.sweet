@@ -80,6 +80,7 @@
           document.body.appendChild(a); a.click(); a.remove();
         };
       } else if (kind === 'video') {
+        // Tạo video trước để kiểm tra có khung hình không
         mediaEl = document.createElement('video');
         mediaEl.src = fileURL;
         mediaEl.controls = true;
@@ -90,14 +91,51 @@
         mediaEl.style.boxShadow = '0 6px 18px rgba(255,150,180,.18)';
         mediaWrap.appendChild(mediaEl);
 
+        // Nếu file thực tế chỉ có audio (ghi âm), chuyển sang audio UI
+        const switchToAudioUI = () => {
+          const audioEl = document.createElement('audio');
+          audioEl.src = fileURL;
+          audioEl.controls = true;
+          audioEl.preload = 'metadata';
+          audioEl.style.width = '100%';
+          audioEl.style.marginTop = '8px';
+          mediaWrap.replaceChild(audioEl, mediaEl);
+
+          actionBtn.textContent = '🎧 Nghe lời chúc';
+          note.textContent = 'Nếu không tự phát, hãy bấm nút ở trên nhé';
+          actionBtn.onclick = () => {
+            if (audioEl.paused) {
+              audioEl.play()
+                .then(() => actionBtn.textContent = '⏸ Dừng lại')
+                .catch(() => alert('Trình duyệt chặn tự phát, bấm lại để phát nhé.'));
+            } else {
+              audioEl.pause(); audioEl.currentTime = 0;
+              actionBtn.textContent = '🎧 Nghe lời chúc';
+            }
+          };
+        };
+
+        // Kiểm tra metadata để biết có track hình hay không
+        mediaEl.addEventListener('loadedmetadata', () => {
+          const noVideoFrame = (mediaEl.videoWidth === 0 && mediaEl.videoHeight === 0);
+          const noVideoTracks = (mediaEl.videoTracks && typeof mediaEl.videoTracks.length === 'number' && mediaEl.videoTracks.length === 0);
+          if (noVideoFrame || noVideoTracks) {
+            switchToAudioUI();
+          }
+        });
+
+        // Điều khiển mặc định cho trường hợp thật sự là video
         actionBtn.textContent = '▶️ Phát video';
         note.textContent = 'Nếu không phát, bấm nút để xem nhé.';
         actionBtn.onclick = () => {
-          if (mediaEl.paused) {
-            mediaEl.play().then(() => actionBtn.textContent = '⏸ Tạm dừng').catch(()=>{});
-          } else {
-            mediaEl.pause();
-            actionBtn.textContent = '▶️ Phát video';
+          // Nếu đã đổi sang audio UI, handler trên sẽ thay thế
+          if (mediaEl && mediaEl.tagName === 'VIDEO') {
+            if (mediaEl.paused) {
+              mediaEl.play().then(() => actionBtn.textContent = '⏸ Tạm dừng').catch(()=>{});
+            } else {
+              mediaEl.pause();
+              actionBtn.textContent = '▶️ Phát video';
+            }
           }
         };
       } else {
