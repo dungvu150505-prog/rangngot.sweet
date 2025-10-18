@@ -1,147 +1,94 @@
+/* server.cjs — RangNgot (Supabase Storage + signed URL 72h) */
 const path = require('path');
-const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
+const crypto = require('crypto');
+const { createClient } = require('@supabase/supabase-js');
 
-const app = express();
 const PORT = process.env.PORT || 3000;
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || '';
-const TTL_HOURS = parseInt(process.env.TTL_HOURS || '72', 10); // thời gian sống link/file
+const CORS_ORIGIN = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(s=>s.trim()) : true;
 
-// CORS
-app.use(cors({
-  origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : true
-}));
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_BUCKET = process.env.SUPABASE_BUCKET || 'rangngot';
 
-// Thư mục & biến tiện dụng
-const ROOT_DIR   = __dirname;
-const PUBLIC_DIR = path.join(ROOT_DIR, 'public');
-const UPLOAD_DIR = path.join(ROOT_DIR, 'uploads');
-if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+const LINK_SECRET = process.env.LINK_SECRET || 'change-me';
+const LINK_TTL_HOURS = Number(process.env.LINK_TTL_HOURS || 72);
 
-// Map: id -> { path, expiresAt }
-const MAP_PATH = path.join(UPLOAD_DIR, 'map.json');
-let urlMap = {};
-try {
-  if (fs.existsSync(MAP_PATH)) urlMap = JSON.parse(fs.readFileSync(MAP_PATH, 'utf8') || '{}');
-} catch { urlMap = {}; }
-
-const nowMs = () => Date.now();
-const inMs  = (h) => h * 60 * 60 * 1000;
-const isExpired = (e) => !e || e.expiresAt <= nowMs();
-
-const saveMap = () => { try { fs.writeFileSync(MAP_PATH, JSON.stringify(urlMap, null, 2)); } catch {} };
-
-// Cron đơn giản: dọn file quá hạn + map
-function cleanupExpired() {
-  let changed = false;
-  for (const id of Object.keys(urlMap)) {
-    const entry = urlMap[id];
-    if (!entry) continue;
-    if (isExpired(entry)) {
-      try {
-        const abs = path.join(ROOT_DIR, entry.path.replace(/^\//, ''));
-        if (abs.startsWith(UPLOAD_DIR) && fs.existsSync(abs)) fs.unlinkSync(abs);
-      } catch {}
-      delete urlMap[id];
-      changed = true;
-    }
-  }
-  if (changed) saveMap();
-
-  // Xoá file rơi rớt > TTL
-  try {
-    const listed = new Set(Object.values(urlMap).map(e => e.path));
-    for (const f of fs.readdirSync(UPLOAD_DIR)) {
-      if (f === path.basename(MAP_PATH)) continue;
-      const rel = '/uploads/' + f;
-      if (!listed.has(rel)) {
-        const abs = path.join(UPLOAD_DIR, f);
-        const stat = fs.statSync(abs);
-        if (nowMs() - stat.mtimeMs > inMs(TTL_HOURS)) {
-          try { fs.unlinkSync(abs); } catch {}
-        }
-      }
-    }
-  } catch {}
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  console.error('[FATAL] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY'); process.exit(1);
 }
-cleanupExpired();
-setInterval(cleanupExpired, 60 * 60 * 1000); // mỗi giờ
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Multer: ảnh / audio / video, ~30MB
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-  filename: (req, file, cb) => {
-    const safe = Date.now() + '-' + (file.originalname || 'file').replace(/[^\w.\-]/g, '_');
-    cb(null, safe);
-  }
-});
+const app = express();
+app.disable('x-powered-by');
+app.use(cors({ origin: CORS_ORIGIN }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+const PUBLIC_DIR = path.join(__dirname, 'public');
+app.use(express.static(PUBLIC_DIR, { maxAge: '1h' }));
+
 const upload = multer({
-  storage,
-  limits: { fileSize: 30 * 1024 * 1024 }, // ~30MB
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 26 * 1024 * 1024, files: 1 },
   fileFilter: (req, file, cb) => {
-    const type = (file.mimetype || '');
-    if (type.startsWith('image/') || type.startsWith('audio/') || type.startsWith('video/')) cb(null, true);
-    else cb(new Error('Chỉ nhận ảnh, âm thanh hoặc video'));
+    const ok = ['image/','audio/','video/'].some(p => (file.mimetype||'').startsWith(p));
+    cb(ok ? null : new Error('Unsupported file type'), ok);
   }
 });
 
-// Static public
-app.use(express.static(PUBLIC_DIR));
+const b64url = {
+  enc: (buf) => Buffer.from(buf).toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''),
+  dec: (str) => Buffer.from(str.replace(/-/g,'+').replace(/_/g,'/'), 'base64')
+};
+const hmac = (data) => crypto.createHmac('sha256', LINK_SECRET).update(data).digest();
+const makeId = (obj) => { const j=Buffer.from(JSON.stringify(obj)); const s=hmac(j); return `${b64url.enc(j)}.${b64url.enc(s)}`; };
+const parseId = (id) => { const [p,s]=String(id).split('.'); if(!p||!s)throw 0; const pj=b64url.dec(p), sj=b64url.dec(s), ex=hmac(pj); if(!crypto.timingSafeEqual(sj,ex))throw 0; return JSON.parse(pj.toString('utf8')); };
+const now = () => Math.floor(Date.now()/1000);
 
-// Guard /uploads: chỉ phục vụ file còn hạn
-app.use('/uploads', (req, res, next) => {
-  const reqPath = '/uploads' + req.path;
-  const ok = Object.values(urlMap).some(e => e.path === reqPath && !isExpired(e));
-  if (!ok) return res.status(404).send('File không tồn tại hoặc đã hết hạn.');
-  express.static(UPLOAD_DIR, { setHeaders: r => r.setHeader('Accept-Ranges', 'bytes') })(req, res, next);
-});
+// Upload: field name 'audio' (giữ nguyên theo UI hiện tại)
+app.post('/upload', upload.single('audio'), async (req, res) => {
+  try {
+    const f = req.file; if (!f) return res.status(400).json({ success:false, message:'No file' });
+    const clean = (f.originalname || 'file').replace(/[^\w.\-]+/g,'_');
+    const key = `u/${Date.now()}-${Math.random().toString(36).slice(2)}-${clean}`;
 
-// Upload (hỗ trợ field 'audio' hoặc 'file')
-const fields = upload.fields([{ name: 'audio', maxCount: 1 }, { name: 'file', maxCount: 1 }]);
-app.post('/upload', fields, (req, res) => {
-  const picked =
-    (req.files?.audio?.[0]) ||
-    (req.files?.file?.[0]) || null;
-  if (!picked) return res.status(400).json({ success: false, message: 'Không có file' });
+    const { error: upErr } = await supabase.storage.from(SUPABASE_BUCKET).upload(key, f.buffer, { contentType: f.mimetype, upsert: false });
+    if (upErr) throw upErr;
 
-  const shortId  = (nowMs().toString(36) + Math.random().toString(36).slice(2, 6)).toLowerCase();
-  const shortUrl = `/r/${shortId}`;
-  const filePath = '/uploads/' + picked.filename;
+    const exp = now() + LINK_TTL_HOURS * 3600;
+    const id = makeId({ b: SUPABASE_BUCKET, k: key, exp });
+    const pathR = `/r/${id}`;
+    const absolute = PUBLIC_BASE_URL ? `${PUBLIC_BASE_URL}${pathR}` : `${req.protocol}://${req.get('host')}${pathR}`;
 
-  urlMap[shortId] = { path: filePath, expiresAt: nowMs() + inMs(TTL_HOURS) };
-  saveMap();
-
-  res.json({
-    success: true,
-    receiverUrl: shortUrl,
-    absoluteReceiverUrl: PUBLIC_BASE_URL ? `${PUBLIC_BASE_URL}${shortUrl}` : undefined,
-    expiresAt: urlMap[shortId].expiresAt
-  });
-});
-
-// Link rút gọn -> kiểm tra hạn -> điều hướng
-app.get('/r/:id', (req, res) => {
-  const entry = urlMap[req.params.id];
-  if (!entry) return res.redirect(`/expired.html?reason=notfound&ttl=${TTL_HOURS}`);
-
-  if (isExpired(entry)) {
-    // dọn luôn
-    try {
-      const abs = path.join(__dirname, entry.path.replace(/^\//, ''));
-      if (abs.startsWith(UPLOAD_DIR) && fs.existsSync(abs)) fs.unlinkSync(abs);
-    } catch {}
-    delete urlMap[req.params.id];
-    saveMap();
-    return res.redirect(`/expired.html?reason=expired&ttl=${TTL_HOURS}`);
+    res.json({ success:true, receiverUrl: pathR, absoluteReceiverUrl: absolute });
+  } catch (e) {
+    console.error('[UPLOAD]', e);
+    res.status(500).json({ success:false, message: /Unsupported/.test(String(e)) ? 'Unsupported file type' : 'Upload failed' });
   }
-
-  return res.redirect(`/receiver.html?file=${encodeURIComponent(entry.path)}`);
 });
 
-// Fallback SPA
-app.get('*', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
+// Resolve link /r/:id -> redirect receiver.html?file=<signedUrl>
+app.get('/r/:id', async (req, res) => {
+  try {
+    const { b, k, exp } = parseId(req.params.id);
+    const t = now();
+    if (!b || !k || !exp) return res.redirect(302, `/expired.html?reason=notfound`);
+    if (t >= exp) return res.redirect(302, `/expired.html?reason=expired&ttl=${LINK_TTL_HOURS}`);
 
-// Start
-app.listen(PORT, () => console.log(`Server chạy: http://localhost:${PORT} (TTL ${TTL_HOURS}h)`));
+    const remain = Math.max(30, Math.min(exp - t, 7*24*3600));
+    const { data: signed, error } = await supabase.storage.from(b).createSignedUrl(k, remain);
+    if (error || !signed?.signedUrl) return res.redirect(302, `/expired.html?reason=notfound`);
+
+    return res.redirect(302, `/receiver.html?file=${encodeURIComponent(signed.signedUrl)}`);
+  } catch {
+    return res.redirect(302, `/expired.html?reason=notfound`);
+  }
+});
+
+app.get('/healthz', (req,res)=>res.json({ok:true,time:new Date().toISOString()}));
+app.use((req,res)=>res.status(404).sendFile(path.join(PUBLIC_DIR,'expired.html')));
+app.listen(PORT, ()=>console.log('RangNgot listening on :'+PORT));
