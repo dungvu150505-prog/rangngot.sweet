@@ -2,3 +2,7 @@ node_modules/
 uploads/*
 !uploads/.gitkeep
 .DS_Store
+
+# local env
+.env
+.env.local
